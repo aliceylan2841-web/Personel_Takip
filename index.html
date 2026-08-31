@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Mesai Takip</title>
+<meta name="description" content="Personel mesai, izin ve talep takip uygulaması">
+<meta name="theme-color" content="#011431">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mesai Takip">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+  body { font-family: sans-serif; margin: 0; padding: 16px; background: #f4f6f9; color: #333; }
+  h2 { color: #1e4678; margin-bottom: 15px; }
+  button { width: 100%; padding: 12px; margin: 6px 0; background: #1e4678; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
+  input, select { width: 100%; padding: 10px; margin: 6px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+  label.f { font-size: 12px; color: #666; display: block; margin-top: 4px; }
+  label.chk { font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  label.chk input { width: auto; margin: 0; }
+  .card { background: white; padding: 14px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; background: #eee; }
+  .badge-blue { background: #1565c0; color: white; }
+  .badge-green { background: #2e7d32; color: white; }
+  .badge-gray { background: #757575; color: white; }
+  .btn-green { background: #2e7d32; }
+  .btn-red { background: #c62828; }
+  .btn-gray { background: #666; }
+  .btn-orange { background: #f57c00; }
+  .warn-box { background: #fff3e0; border: 1px solid #f57c00; color: #e65100; padding: 10px; border-radius: 6px; font-size: 13px; margin: 6px 0; }
+  .danger-box { background: #ffebee; border: 1px solid #c62828; color: #b71c1c; padding: 10px; border-radius: 6px; font-size: 13px; margin: 6px 0; font-weight: bold; }
+  .info-box { background: #e3f2fd; border: 1px solid #1565c0; color: #0d47a1; padding: 10px; border-radius: 6px; font-size: 12px; margin: 6px 0; }
+
+  /* Takvim */
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-header button { width: auto; padding: 8px 14px; margin: 0; }
+  .cal-title { font-weight: bold; color: #1e4678; font-size: 17px; }
+  .cal-filters { display: flex; gap: 6px; }
+  .cal-filters select { margin: 0; font-size: 12px; padding: 6px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 12px; }
+  .cal-dow { text-align: center; font-size: 11px; font-weight: bold; color: #888; padding: 4px 0; }
+  .cal-day { background: white; border-radius: 6px; min-height: 58px; padding: 4px; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); position: relative; }
+  .cal-day.empty { background: transparent; box-shadow: none; }
+  .cal-day.today { border: 2px solid #1e4678; }
+  .cal-day.has-req { cursor: pointer; }
+  .cal-daynum { font-weight: bold; color: #444; }
+  .cal-warn { position: absolute; top: 2px; right: 3px; font-size: 11px; }
+  .cal-dots { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 3px; }
+  .cal-dot { font-size: 9px; font-weight: bold; color: white; border-radius: 3px; padding: 1px 3px; line-height: 1.3; display: inline-block; }
+
+  .req-line { padding: 6px 0; border-bottom: 1px solid #eee; }
+  .req-line:last-child { border-bottom: none; }
+  .row2 { display: flex; gap: 6px; }
+  .row2 button { padding: 8px; }
+  .quick-row { display: flex; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid #eee; }
+  .quick-row select { margin: 0; flex: 1; font-size: 12px; padding: 6px; }
+  .quick-row button { width: auto; margin: 0; padding: 6px 10px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+let state = {
+  page: 'home',
+  employees: JSON.parse(localStorage.getItem('mt_employees') || '[]'),
+  requests: JSON.parse(localStorage.getItem('mt_requests') || '[]'),
+  calYear: new Date().getFullYear(),
+  calMonth: new Date().getMonth(),
+  calTypeFilter: 'all',
+  calEmpFilter: 'all',
+  selectedDate: null,
+  editEmpIdx: null,
+  leaveEmpId: null,
+  mtDate: null,
+  repYear: null,
+  repMonth: null,
+  empSearch: '',
+  empDeptFilter: 'all',
+  empShowInactive: false
+};
+
+// Manifest kısayollarından (örn. ?page=calendar) gelen başlangıç sayfasını uygula
+(function applyStartPage() {
+  const params = new URLSearchParams(window.location.search);
+  const p = params.get('page');
+  const allowed = ['new_req', 'calendar', 'emp_list', 'reqs_pending', 'reqs_all', 'reports', 'settings', 'leave_plan_all', 'daily_status'];
+  if (p && allowed.includes(p)) state.page = p;
+})();
+
+function save() {
+  localStorage.setItem('mt_employees', JSON.stringify(state.employees));
+  localStorage.setItem('mt_requests', JSON.stringify(state.requests));
+}
+function getMinStaff() { return parseInt(localStorage.getItem('mt_minStaff') || '0'); }
+function setMinStaff(v) { localStorage.setItem('mt_minStaff', v || '0'); render(); }
+
+const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const AYLAR_KISA = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+const GUNLER = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+const DOW_KISA = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+const REQ_TYPES = ['Akşam Erken Çıkış','Cumartesi Mesaisi','Yıllık İzin','Mazeret İzni','Raporlu','Diğer'];
+const TYPE_COLORS = {
+  'Cumartesi Mesaisi': '#7b1fa2',
+  'Akşam Erken Çıkış': '#f57c00',
+  'Raporlu': '#c62828',
+  'Mazeret İzni': '#616161',
+  'Yıllık İzin': '#1565c0',
+  'Diğer': '#455a64'
+};
+const todayStr = () => new Date().toISOString().split('T')[0];
+
+function pad(n) { return n.toString().padStart(2, '0'); }
+
+function formatDateTR(dateStr) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return `${d} ${AYLAR_KISA[m - 1]} ${y}, ${GUNLER[dt.getDay()]}`;
+}
+function daysInclusive(start, end) {
+  return Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
+}
+function formatRangeTR(r) {
+  if (r.endDate && r.endDate !== r.date) {
+    return `${formatDateTR(r.date)} → ${formatDateTR(r.endDate)} (${daysInclusive(r.date, r.endDate)} gün)`;
+  }
+  return formatDateTR(r.date) + (r.time ? ' ' + r.time : '');
+}
+function rangeIncludes(r, dateStr) {
+  const end = r.endDate || r.date;
+  return dateStr >= r.date && dateStr <= end;
+}
+function initials(name) {
+  return name.trim().split(/\s+/).map(p => p[0]).join('').toUpperCase().slice(0, 2);
+}
+function isLeaveType(type) {
+  return type.includes('İzin') || type === 'Raporlu';
+}
+function typeColor(type) { return TYPE_COLORS[type] || '#455a64'; }
+
+function otherEmployeesOnDate(dateStr, excludeEmpId) {
+  const seen = new Set();
+  const names = [];
+  state.requests.forEach(r => {
+    if (r.emp !== excludeEmpId && r.status !== 'Reddedildi' && rangeIncludes(r, dateStr) && !seen.has(r.emp)) {
+      const emp = state.employees.find(e => e.id === r.emp);
+      if (emp) { seen.add(r.emp); names.push(emp.name); }
+    }
+  });
+  return names;
+}
+function typeOptions(selected) {
+  return REQ_TYPES.map(t => `<option ${t === selected ? 'selected' : ''}>${t}</option>`).join('');
+}
+function activeEmployees() { return state.employees.filter(e => e.active !== false); }
+
+function leaveEmpIdsOnDate(dateStr) {
+  return new Set(state.requests.filter(r => isLeaveType(r.type) && r.status === 'Onaylandı' && rangeIncludes(r, dateStr)).map(r => r.emp));
+}
+function workingCountForDate(dateStr) {
+  return activeEmployees().length - leaveEmpIdsOnDate(dateStr).size;
+}
+
+// --- Kıdem / Yıllık izin hakkı (4857 s. Kanun m.53'e göre yaklaşık) ---
+function seniorityText(hireDate) {
+  if (!hireDate) return 'Belirtilmemiş';
+  const now = new Date(), hd = new Date(hireDate);
+  let months = (now.getFullYear() - hd.getFullYear()) * 12 + (now.getMonth() - hd.getMonth());
+  if (now.getDate() < hd.getDate()) months--;
+  if (months < 0) months = 0;
+  return `${Math.floor(months / 12)} yıl ${months % 12} ay`;
+}
+function annualEntitlement(hireDate) {
+  if (!hireDate) return null;
+  const years = (new Date() - new Date(hireDate)) / (1000 * 60 * 60 * 24 * 365.25);
+  if (years < 1) return 0;
+  if (years <= 5) return 14;
+  if (years < 15) return 20;
+  return 26;
+}
+function usedAnnualLeaveDaysThisYear(empId) {
+  const year = new Date().getFullYear();
+  return state.requests
+    .filter(r => r.emp === empId && r.type === 'Yıllık İzin' && r.status === 'Onaylandı' && new Date(r.date).getFullYear() === year)
+    .reduce((sum, r) => sum + daysInclusive(r.date, r.endDate || r.date), 0);
+}
+
+// --- Aylık istatistik (Raporlar + ana sayfa için) ---
+function monthlyStats(empId, year, month) {
+  const stats = { izinGun: 0, erken: 0, cumartesi: 0, raporlu: 0, mazeret: 0 };
+  const monthStart = new Date(year, month, 1), monthEnd = new Date(year, month + 1, 0);
+  state.requests.filter(r => r.emp === empId && r.status !== 'Reddedildi').forEach(r => {
+    const start = new Date(r.date), end = new Date(r.endDate || r.date);
+    if (end < monthStart || start > monthEnd) return;
+    const overlapStart = start < monthStart ? monthStart : start;
+    const overlapEnd = end > monthEnd ? monthEnd : end;
+    const days = Math.round((overlapEnd - overlapStart) / 86400000) + 1;
+    if (r.type === 'Yıllık İzin') stats.izinGun += days;
+    else if (r.type === 'Akşam Erken Çıkış') stats.erken += days;
+    else if (r.type === 'Cumartesi Mesaisi') stats.cumartesi += days;
+    else if (r.type === 'Raporlu') stats.raporlu += days;
+    else if (r.type === 'Mazeret İzni') stats.mazeret += days;
+  });
+  stats.mesaiSaat = stats.cumartesi * 12;
+  return stats;
+}
+
+// --- Günlük durum (Mesai Takibi matrisi) ---
+function getDailyStatus(empId, dateStr) {
+  const r = state.requests.find(rq => rq.emp === empId && rangeIncludes(rq, dateStr) && rq.status !== 'Reddedildi');
+  if (!r) return 'Çalışıyor';
+  if (r.type === 'Yıllık İzin') return 'İzinli';
+  if (r.type === 'Akşam Erken Çıkış') return 'Erken Çıkış';
+  if (r.type === 'Cumartesi Mesaisi') return 'Cumartesi Mesaisi';
+  if (r.type === 'Raporlu') return 'Raporlu';
+  if (r.type === 'Mazeret İzni') return 'Mazeret';
+  return r.type;
+}
+function setDailyStatus(empId, dateStr, label) {
+  const existing = state.requests.find(r => r.emp === empId && rangeIncludes(r, dateStr));
+  if (existing && existing.endDate && existing.endDate !== existing.date) {
+    alert('Bu tarih çok günlü bir izin planının parçası. Değiştirmek için İzin Planı sayfasından düzenleyin.');
+    render();
+    return;
+  }
+  state.requests = state.requests.filter(r => !(r.emp === empId && r.date === dateStr && (!r.endDate || r.endDate === dateStr)));
+  const map = { 'İzinli': 'Yıllık İzin', 'Erken Çıkış': 'Akşam Erken Çıkış', 'Cumartesi Mesaisi': 'Cumartesi Mesaisi', 'Raporlu': 'Raporlu', 'Mazeret': 'Mazeret İzni' };
+  if (label !== 'Çalışıyor') {
+    state.requests.push({ id: Date.now().toString() + Math.random().toString(36).slice(2, 6), emp: empId, type: map[label], date: dateStr, endDate: dateStr, time: '', note: '', status: 'Onaylandı', used: false });
+  }
+  save(); render();
+}
+
+function render() {
+  const root = document.getElementById('app');
+
+  if (state.page === 'home') {
+    const today = todayStr();
+    const emps = activeEmployees();
+    const pending = state.requests.filter(r => r.status === 'Bekliyor').length;
+    const onLeaveToday = leaveEmpIdsOnDate(today).size;
+    const workingToday = emps.length - onLeaveToday;
+    const earlyToday = state.requests.filter(r => r.type === 'Akşam Erken Çıkış' && r.status === 'Onaylandı' && rangeIncludes(r, today)).length;
+    const y = new Date().getFullYear(), m = new Date().getMonth();
+    let monthLeaveDays = 0, monthOvertimeShifts = 0;
+    emps.forEach(e => { const s = monthlyStats(e.id, y, m); monthLeaveDays += s.izinGun; monthOvertimeShifts += s.cumartesi; });
+    const upcoming = state.requests.filter(r => isLeaveType(r.type) && r.status === 'Onaylandı' && r.date >= today)
+      .sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
+    let upcomingHtml = upcoming.map(r => {
+      const emp = state.employees.find(e => e.id === r.emp);
+      return `<div class="req-line"><b>${emp ? emp.name : ''}</b><br>${formatRangeTR(r)}</div>`;
+    }).join('');
+
+    root.innerHTML = `
+      <h2>PERSONEL TAKİP</h2>
+      <div class="card">
+        👥 Personel: <b>${emps.length}</b><br>
+        🟢 Bugün çalışan: <b>${workingToday}</b> &nbsp; 🔵 Bugün izinli: <b>${onLeaveToday}</b><br>
+        🟠 Bekleyen talep: <b>${pending}</b> &nbsp; 🕐 Bugün erken çıkış: <b>${earlyToday}</b><br>
+        📊 Bu ay izin: <b>${monthLeaveDays} gün</b> &nbsp; 📈 Bu ay mesai: <b>${monthOvertimeShifts * 12} saat</b>
+      </div>
+      ${upcomingHtml ? `<div class="card"><b>🔔 Yaklaşan İzinler</b>${upcomingHtml}</div>` : ''}
+      <button onclick="state.page='leave_plan_all';render()">📅 İZİN PLANI</button>
+      <button onclick="state.page='daily_status';render()">🕐 MESAİ TAKİBİ</button>
+      <button onclick="state.page='new_req';render()">📝 TALEP OLUŞTUR</button>
+      <button onclick="state.page='calendar';render()">🗓️ TAKVİM</button>
+      <button onclick="state.page='emp_list';render()">👥 PERSONELLER</button>
+      <button onclick="state.page='reqs_pending';render()">🔔 BEKLEYEN TALEPLER (${pending})</button>
+      <button onclick="state.page='reqs_all';render()">📋 TÜM TALEPLER</button>
+      <button onclick="state.page='reports';render()">📊 RAPORLAR</button>
+      <button onclick="state.page='settings';render()">⚙️ AYARLAR</button>
+    `;
+
+  } else if (state.page === 'emp_list') {
+    const today = todayStr();
+    const depts = [...new Set(state.employees.map(e => e.dept).filter(Boolean))];
+    let list = state.employees.map((e, idx) => ({ e, idx }))
+      .filter(({ e }) => state.empShowInactive || e.active !== false)
+      .filter(({ e }) => state.empDeptFilter === 'all' || e.dept === state.empDeptFilter)
+      .filter(({ e }) => !state.empSearch || e.name.toLowerCase().includes(state.empSearch.toLowerCase()))
+      .map(({ e, idx }) => {
+        const entitlement = annualEntitlement(e.hireDate);
+        const used = entitlement !== null ? usedAnnualLeaveDaysThisYear(e.id) : 0;
+        const remaining = entitlement !== null ? Math.max(entitlement - used, 0) : null;
+        const activeLeave = state.requests.find(r => r.emp === e.id && isLeaveType(r.type) && r.status === 'Onaylandı' && rangeIncludes(r, today));
+        return `
+          <div class="card">
+            <b>${e.name}</b> ${e.active === false ? '<span class="badge badge-gray">PASİF</span>' : ''}<br>
+            <small>Sicil: ${e.sicil || '-'} | Bölüm: ${e.dept || '-'} | Görev: ${e.title || '-'} | Vardiya: ${e.shift || '-'}</small><br>
+            ${e.phone ? `<small>Tel: ${e.phone}</small><br>` : ''}
+            <small>İşe Giriş: ${e.hireDate ? formatDateTR(e.hireDate) : 'Belirtilmemiş'} | Kıdem: ${seniorityText(e.hireDate)}</small><br>
+            ${entitlement !== null ? `<small>Yıllık İzin Hakkı: ${entitlement} gün | Kullanılan: ${used} gün | Kalan: ${remaining} gün</small><br>` : `<small>Yıllık izin hesabı için işe giriş tarihi ekleyin</small><br>`}
+            <span class="badge ${activeLeave ? 'badge-blue' : 'badge-green'}">${activeLeave ? '🔵 Şu an İzinli: ' + activeLeave.type : '🟢 Çalışıyor'}</span>
+            <div class="row2" style="margin-top:8px">
+              <button class="btn-orange" style="padding:6px;font-size:12px" onclick="openLeaveAdd('${e.id}')">🗓️ İzin</button>
+              <button class="btn-gray" style="padding:6px;font-size:12px" onclick="openLeaveList('${e.id}')">📋 Geçmiş</button>
+            </div>
+            <div class="row2" style="margin-top:6px">
+              <button class="btn-gray" style="padding:6px;font-size:12px" onclick="openEmpEdit(${idx})">✏️ Düzenle</button>
+              <button class="btn-red" style="padding:6px;font-size:12px" onclick="deleteEmp(${idx})">🗑 Sil</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    root.innerHTML = `
+      <h2>PERSONELLER</h2>
+      <input placeholder="🔍 Personel ara..." value="${state.empSearch}" oninput="state.empSearch=this.value;render()">
+      <select onchange="state.empDeptFilter=this.value;render()">
+        <option value="all">Tüm Bölümler</option>
+        ${depts.map(d => `<option ${state.empDeptFilter === d ? 'selected' : ''}>${d}</option>`).join('')}
+      </select>
+      <label class="chk"><input type="checkbox" ${state.empShowInactive ? 'checked' : ''} onchange="state.empShowInactive=this.checked;render()"> Pasif personeli de göster</label>
+      <button onclick="state.page='emp_add';render()">➕ Yeni Çalışan Ekle</button>
+      ${list || '<p>Kayıt bulunamadı.</p>'}
+      <div class="info-box">ℹ️ Yıllık izin hakkı 4857 sayılı Kanun'a göre yaklaşık hesaplanır (14/20/26 gün kademeleri). Kesin hak için İK ile teyit edin.</div>
+      <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>
+    `;
+
+  } else if (state.page === 'emp_add') {
+    root.innerHTML = `
+      <h2>YENİ ÇALIŞAN</h2>
+      <input id="ename" placeholder="Ad Soyad">
+      <input id="esicil" placeholder="Sicil No">
+      <input id="edept" placeholder="Bölüm">
+      <input id="etitle" placeholder="Görev">
+      <input id="eshift" placeholder="Vardiya (ör. 12 Saat)" value="12 Saat">
+      <input id="ephone" placeholder="Telefon (isteğe bağlı)">
+      <label class="f">İşe Giriş Tarihi</label>
+      <input id="ehire" type="date">
+      <label class="f">Durum</label>
+      <select id="eactive"><option value="true">Aktif</option><option value="false">Pasif</option></select>
+      <button class="btn-green" onclick="addEmp()">💾 KAYDET</button>
+      <button class="btn-gray" onclick="state.page='emp_list';render()">⬅ İptal</button>
+    `;
+
+  } else if (state.page === 'emp_edit') {
+    const e = state.employees[state.editEmpIdx];
+    if (!e) { state.page = 'emp_list'; render(); return; }
+    root.innerHTML = `
+      <h2>ÇALIŞANI DÜZENLE</h2>
+      <input id="ename" value="${e.name}" placeholder="Ad Soyad">
+      <input id="esicil" value="${e.sicil || ''}" placeholder="Sicil No">
+      <input id="edept" value="${e.dept || ''}" placeholder="Bölüm">
+      <input id="etitle" value="${e.title || ''}" placeholder="Görev">
+      <input id="eshift" value="${e.shift || ''}" placeholder="Vardiya">
+      <input id="ephone" value="${e.phone || ''}" placeholder="Telefon">
+      <label class="f">İşe Giriş Tarihi</label>
+      <input id="ehire" type="date" value="${e.hireDate || ''}">
+      <label class="f">Durum</label>
+      <select id="eactive">
+        <option value="true" ${e.active !== false ? 'selected' : ''}>Aktif</option>
+        <option value="false" ${e.active === false ? 'selected' : ''}>Pasif</option>
+      </select>
+      <button class="btn-green" onclick="saveEmpEdit()">💾 KAYDET</button>
+      <button class="btn-gray" onclick="state.page='emp_list';render()">⬅ İptal</button>
+    `;
+
+  } else if (state.page === 'leave_plan_all') {
+    const today = todayStr();
+    let items = state.requests.filter(r => isLeaveType(r.type)).sort((a, b) => a.date.localeCompare(b.date));
+    let list = items.map(r => {
+      const emp = state.employees.find(e => e.id === r.emp);
+      const upcoming = r.date >= today;
+      return `
+        <div class="card">
+          <b>${emp ? emp.name : 'Silinmiş'}</b> — ${r.type}<br>
+          ${formatRangeTR(r)}<br>
+          <span class="badge">${r.status}</span> ${upcoming ? '<span class="badge badge-blue">Yaklaşan</span>' : ''}
+          <div class="row2" style="margin-top:6px">
+            <button style="padding:6px;font-size:12px" onclick="toggleUsed('${r.id}')">${r.used ? '☑ Planlandı' : '☐ Planlandı'}</button>
+            <button class="btn-red" style="padding:6px;font-size:12px" onclick="deleteReq('${r.id}')">🗑 Sil</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    root.innerHTML = `
+      <h2>İZİN PLANI</h2>
+      <button class="btn-green" onclick="state.page='leave_plan_add';render()">➕ Yeni İzin Planla</button>
+      ${list || '<p>Henüz izin planı yok.</p>'}
+      <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>
+    `;
+
+  } else if (state.page === 'leave_plan_add' || state.page === 'leave_add') {
+    const isGlobal = state.page === 'leave_plan_add';
+    if (!state.employees.length) { alert('Önce çalışan ekleyin.'); state.page = 'emp_add'; render(); return; }
+    const emp = isGlobal ? null : state.employees.find(e => e.id === state.leaveEmpId);
+    root.innerHTML = `
+      <h2>İZİN EKLE ${emp ? '— ' + emp.name : ''}</h2>
+      ${isGlobal ? `<select id="lpemp">${state.employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}</select>` : ''}
+      <select id="lvtype">${typeOptions('Yıllık İzin')}</select>
+      <label class="f">Başlangıç Tarihi</label>
+      <input id="lvstart" type="date" value="${todayStr()}">
+      <label class="f">Bitiş Tarihi</label>
+      <input id="lvend" type="date" value="${todayStr()}">
+      <input id="lvnote" placeholder="Açıklama (isteğe bağlı)">
+      <button class="btn-green" onclick="saveLeave()">💾 KAYDET</button>
+      <button class="btn-gray" onclick="state.page='${isGlobal ? 'leave_plan_all' : 'emp_list'}';render()">⬅ İptal</button>
+    `;
+
+  } else if (state.page === 'leave_list') {
+    const emp = state.employees.find(e => e.id === state.leaveEmpId);
+    let items = state.requests.filter(r => r.emp === state.leaveEmpId && isLeaveType(r.type)).sort((a, b) => b.date.localeCompare(a.date));
+    let list = items.map(r => `
+      <div class="card">
+        ${r.type}<br>
+        ${formatRangeTR(r)}<br>
+        Durum: <span class="badge">${r.status}</span> ${r.used ? '☑ KULLANILDI' : ''}
+        <div class="row2" style="margin-top:6px">
+          <button style="padding:6px;font-size:12px" onclick="toggleUsed('${r.id}')">${r.used ? '☐ Kullanılmadı işaretle' : '☑ Kullanıldı işaretle'}</button>
+          <button class="btn-red" style="padding:6px;font-size:12px" onclick="deleteReq('${r.id}')">🗑 Sil</button>
+        </div>
+      </div>
+    `).join('');
+    root.innerHTML = `
+      <h2>İZİN GEÇMİŞİ — ${emp ? emp.name : ''}</h2>
+      <button class="btn-green" onclick="openLeaveAdd('${state.leaveEmpId}')">➕ Yeni İzin Ekle</button>
+      ${list || '<p>Kayıt yok.</p>'}
+      <button class="btn-gray" onclick="state.page='emp_list';render()">⬅ Çalışanlara Dön</button>
+    `;
+
+  } else if (state.page === 'daily_status') {
+    const d = state.mtDate || todayStr();
+    const emps = activeEmployees();
+    const opts = ['Çalışıyor', 'İzinli', 'Erken Çıkış', 'Cumartesi Mesaisi', 'Raporlu', 'Mazeret'];
+    let rows = emps.map(e => {
+      const cur = getDailyStatus(e.id, d);
+      return `
+        <div class="quick-row">
+          <span style="flex:1">${e.name}</span>
+          <select onchange="setDailyStatus('${e.id}','${d}',this.value)">
+            ${opts.map(o => `<option ${o === cur ? 'selected' : ''}>${o}</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }).join('');
+    root.innerHTML = `
+      <h2>MESAİ TAKİBİ (12 Saat)</h2>
+      <input type="date" value="${d}" onchange="state.mtDate=this.value;render()">
+      <div class="card">${rows || '<p>Aktif çalışan yok.</p>'}</div>
+      <div class="info-box">ℹ️ Bu ekran o günün durumunu tek tıkla kaydeder. Çok günlük planlanmış izinler İzin Planı'ndan yönetilir.</div>
+      <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>
+    `;
+
+  } else if (state.page === 'new_req') {
+    if (!state.employees.length) { alert('Önce çalışan ekleyin.'); state.page = 'emp_add'; render(); return; }
+    let opts = state.employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+    let prefillDate = state.selectedDate || todayStr();
+    root.innerHTML = `
+      <h2>YENİ TALEP</h2>
+      <select id="remp" onchange="checkDateWarning()">${opts}</select>
+      <select id="rtype">${typeOptions()}</select>
+      <input id="rdate" type="date" value="${prefillDate}" oninput="checkDateWarning()">
+      <input id="rtime" placeholder="Saat (ör. 20:00)">
+      <input id="rnote" placeholder="Açıklama (isteğe bağlı)">
+      <div id="dateWarning"></div>
+      <button class="btn-green" onclick="addReq()">📌 TALEP OLUŞTUR</button>
+      <button class="btn-gray" onclick="state.selectedDate=null;state.page='home';render()">⬅ İptal</button>
+    `;
+    state.selectedDate = null;
+    setTimeout(checkDateWarning, 0);
+
+  } else if (state.page.startsWith('reqs_')) {
+    const isPending = state.page === 'reqs_pending';
+    let filtered = state.requests.filter(r => isPending ? r.status === 'Bekliyor' : true)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    let list = filtered.map(r => renderReqCard(r)).join('');
+    root.innerHTML = `
+      <h2>${isPending ? 'BEKLEYEN TALEPLER' : 'TÜM TALEPLER'}</h2>
+      ${list || '<p>Kayıt bulunamadı.</p>'}
+      <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>
+    `;
+
+  } else if (state.page === 'calendar') {
+    root.innerHTML = renderCalendar();
+
+  } else if (state.page === 'day_detail') {
+    let matches = state.requests.filter(r => rangeIncludes(r, state.selectedDate))
+      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    let list = matches.map(r => renderReqCard(r)).join('');
+
+    let bookedEmpIds = new Set(matches.map(r => r.emp));
+    let freeEmployees = state.employees.filter(e => !bookedEmpIds.has(e.id));
+    let quickList = freeEmployees.map(e => `
+      <div class="quick-row">
+        <span style="flex:1">${e.name}</span>
+        <select id="qtype_${e.id}">${typeOptions()}</select>
+        <button class="btn-green" onclick="quickAdd('${e.id}')">✅ Ekle</button>
+      </div>
+    `).join('');
+
+    const uniqueCount = new Set(matches.map(r => r.emp)).size;
+    const activeCount = activeEmployees().length;
+    const leaveCount = leaveEmpIdsOnDate(state.selectedDate).size;
+    const workingCount = activeCount - leaveCount;
+    const minStaff = getMinStaff();
+    const understaffed = minStaff > 0 && workingCount < minStaff;
+
+    root.innerHTML = `
+      <h2>${formatDateTR(state.selectedDate)}</h2>
+      ${understaffed ? `<div class="danger-box">🔴 VARDİYA UYARISI: Çalışan sayısı (${workingCount}) minimum seviyenin (${minStaff}) altında! (Toplam: ${activeCount}, İzinli: ${leaveCount})</div>` : (uniqueCount > 1 ? `<div class="warn-box">⚠ Bu tarihte ${uniqueCount} farklı çalışan var, çakışma olabilir.</div>` : '')}
+      ${list || '<p>Bu tarihte kayıt yok.</p>'}
+      ${freeEmployees.length ? `
+        <div class="card">
+          <b>Hızlı İşaretle</b> <small>(tür seç, onaylı olarak eklenir)</small>
+          ${quickList}
+        </div>
+      ` : ''}
+      <button class="btn-green" onclick="state.page='new_req';render()">➕ Detaylı Talep Ekle</button>
+      <button class="btn-gray" onclick="state.page='calendar';render()">⬅ Takvime Dön</button>
+    `;
+
+  } else if (state.page === 'reports') {
+    const y = state.repYear || new Date().getFullYear();
+    const m = state.repMonth != null ? state.repMonth : new Date().getMonth();
+    let rows = activeEmployees().map(e => {
+      const s = monthlyStats(e.id, y, m);
+      return `
+        <div class="card">
+          <b>${e.name}</b><br>
+          <small>İzin: ${s.izinGun} gün | Erken Çıkış: ${s.erken} gün | Cumartesi Mesaisi: ${s.cumartesi} gün | Raporlu: ${s.raporlu} gün | Mazeret: ${s.mazeret} gün</small><br>
+          <small><b>Toplam Ekstra Mesai: ${s.mesaiSaat} saat</b></small>
+        </div>
+      `;
+    }).join('');
+    const monthOpts = AYLAR.map((a, i) => `<option value="${i}" ${i === m ? 'selected' : ''}>${a}</option>`).join('');
+    root.innerHTML = `
+      <h2>RAPORLAR</h2>
+      <div class="row2">
+        <select onchange="state.repMonth=parseInt(this.value);render()">${monthOpts}</select>
+        <input type="number" value="${y}" onchange="state.repYear=parseInt(this.value);render()">
+      </div>
+      <button class="btn-green" onclick="exportReportCSV(${y},${m})">📥 CSV / Excel'e Aktar</button>
+      ${rows || '<p>Aktif personel yok.</p>'}
+      <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>
+    `;
+
+  } else if (state.page === 'settings') {
+    root.innerHTML = `
+      <h2>AYARLAR</h2>
+      <div class="card">
+        <label class="f">Vardiya için minimum çalışan sayısı (0 = kapalı)</label>
+        <input type="number" min="0" value="${getMinStaff()}" onchange="setMinStaff(this.value)">
+        <small>Bir günde çalışan sayısı bu değerin altına düşerse gün ekranında ve takvimde uyarı gösterilir.</small>
+      </div>
+      <div class="card">
+        <b>Yedekleme</b><br><br>
+        <button class="btn-green" onclick="exportBackup()">📤 Verileri Yedekle (.json)</button>
+        <label class="f">Yedek Dosyasını Yükle</label>
+        <input type="file" accept="application/json" onchange="importBackupFile(this)">
+      </div>
+      <div class="card">
+        <button class="btn-red" onclick="wipeAllData()">🗑️ Tüm Verileri Sil</button>
+      </div>
+      <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>
+    `;
+  }
+}
+
+function renderReqCard(r) {
+  let emp = state.employees.find(e => e.id === r.emp);
+  return `
+    <div class="card">
+      <b>${emp ? emp.name : 'Silinmiş Çalışan'}</b><br>
+      ${r.type} | ${formatRangeTR(r)}<br>
+      Durum: <span class="badge">${r.status}</span> ${r.used ? '☑ KULLANILDI' : ''}<br>
+      <small>${r.note || ''}</small>
+      ${r.status === 'Bekliyor' ? `
+        <div class="row2" style="margin-top:6px">
+          <button class="btn-green" onclick="setReqStatus('${r.id}','Onaylandı')">✅ Onayla</button>
+          <button class="btn-red" onclick="setReqStatus('${r.id}','Reddedildi')">❌ Reddet</button>
+        </div>
+      ` : ''}
+      ${r.status === 'Onaylandı' ? `
+        <button style="padding:6px;margin-top:6px" onclick="toggleUsed('${r.id}')">${r.used ? '☐ Kullanılmadı olarak işaretle' : '☑ Kullanıldı olarak işaretle'}</button>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderCalendar() {
+  const y = state.calYear, m = state.calMonth;
+  const firstDow = (new Date(y, m, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const today = todayStr();
+  const minStaff = getMinStaff();
+
+  let cells = '';
+  for (let i = 0; i < firstDow; i++) cells += `<div class="cal-day empty"></div>`;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${y}-${pad(m + 1)}-${pad(d)}`;
+    let matches = state.requests.filter(r => rangeIncludes(r, dateStr));
+    if (state.calTypeFilter !== 'all') matches = matches.filter(r => r.type === state.calTypeFilter);
+    if (state.calEmpFilter !== 'all') matches = matches.filter(r => r.emp === state.calEmpFilter);
+
+    const isToday = dateStr === today;
+    const uniqueEmpCount = new Set(state.requests.filter(r => rangeIncludes(r, dateStr)).map(r => r.emp)).size;
+    const understaffed = minStaff > 0 && workingCountForDate(dateStr) < minStaff;
+
+    let dots = '';
+    matches.slice(0, 5).forEach(r => {
+      let emp = state.employees.find(e => e.id === r.emp);
+      let label = emp ? initials(emp.name) : '?';
+      let strike = r.status === 'Reddedildi' ? 'text-decoration:line-through;opacity:.6;' : '';
+      let prefix = r.status === 'Bekliyor' ? '⏳' : '';
+      if (isLeaveType(r.type)) {
+        dots += `<span class="cal-dot" style="background:${typeColor(r.type)};cursor:pointer;${strike}" onclick="event.stopPropagation();toggleUsed('${r.id}')">${r.used ? '☑' : '☐'}${label}</span>`;
+      } else {
+        dots += `<span class="cal-dot" style="background:${typeColor(r.type)};${strike}">${prefix}${label}</span>`;
+      }
+    });
+    if (matches.length > 5) dots += `<span class="cal-dot" style="background:#999">+${matches.length - 5}</span>`;
+
+    cells += `
+      <div class="cal-day ${matches.length ? 'has-req' : ''} ${isToday ? 'today' : ''}"
+        ${matches.length ? `onclick="viewDay('${dateStr}')"` : ''}>
+        ${understaffed ? `<span class="cal-warn" style="color:#c62828">🔴</span>` : (uniqueEmpCount > 1 ? `<span class="cal-warn">⚠</span>` : '')}
+        <div class="cal-daynum">${d}</div>
+        <div class="cal-dots">${dots}</div>
+      </div>
+    `;
+  }
+
+  const dow = DOW_KISA.map(d => `<div class="cal-dow">${d}</div>`).join('');
+  const typeFilterOpts = `<option value="all">Tüm Türler</option>` + REQ_TYPES.map(t => `<option ${state.calTypeFilter === t ? 'selected' : ''}>${t}</option>`).join('');
+  const empFilterOpts = `<option value="all">Tüm Çalışanlar</option>` + state.employees.map(e => `<option value="${e.id}" ${state.calEmpFilter === e.id ? 'selected' : ''}>${e.name}</option>`).join('');
+
+  return `
+    <h2>TAKVİM</h2>
+    <div class="cal-header">
+      <button class="btn-gray" onclick="shiftMonth(-1)">◀</button>
+      <span class="cal-title">${AYLAR[m]} ${y}</span>
+      <button class="btn-gray" onclick="shiftMonth(1)">▶</button>
+    </div>
+    <div class="cal-filters">
+      <select onchange="state.calTypeFilter=this.value;render()">${typeFilterOpts}</select>
+      <select onchange="state.calEmpFilter=this.value;render()">${empFilterOpts}</select>
+    </div>
+    <div class="cal-grid">${dow}${cells}</div>
+    <div class="card" style="font-size:12px">
+      <span class="cal-dot" style="background:${typeColor('Yıllık İzin')}">☐AB</span> Yıllık İzin &nbsp;
+      <span class="cal-dot" style="background:${typeColor('Akşam Erken Çıkış')}">AB</span> Erken Çıkış &nbsp;
+      <span class="cal-dot" style="background:${typeColor('Cumartesi Mesaisi')}">AB</span> Cumartesi Mesaisi<br>
+      <span class="cal-dot" style="background:${typeColor('Raporlu')}">AB</span> Raporlu &nbsp;
+      <span class="cal-dot" style="background:${typeColor('Mazeret İzni')}">AB</span> Mazeret İzni<br>
+      ⏳ Bekliyor &nbsp; ⚠ Birden fazla kişi &nbsp; 🔴 Personel açığı riski
+    </div>
+    <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>
+  `;
+}
+
+function shiftMonth(delta) {
+  state.calMonth += delta;
+  if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
+  if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
+  render();
+}
+function viewDay(dateStr) { state.selectedDate = dateStr; state.page = 'day_detail'; render(); }
+function openEmpEdit(idx) { state.editEmpIdx = idx; state.page = 'emp_edit'; render(); }
+function openLeaveAdd(empId) { state.leaveEmpId = empId; state.page = 'leave_add'; render(); }
+function openLeaveList(empId) { state.leaveEmpId = empId; state.page = 'leave_list'; render(); }
+
+function checkDateWarning() {
+  const dateEl = document.getElementById('rdate');
+  const empEl = document.getElementById('remp');
+  const box = document.getElementById('dateWarning');
+  if (!dateEl || !empEl || !box) return;
+  const others = otherEmployeesOnDate(dateEl.value, empEl.value);
+  box.innerHTML = others.length ? `<div class="warn-box">⚠ Bu tarihte zaten kayıtlı: ${others.join(', ')}</div>` : '';
+}
+
+function addEmp() {
+  let name = document.getElementById('ename').value.trim();
+  if (!name) return alert('Ad Soyad giriniz');
+  state.employees.push({
+    id: Date.now().toString(),
+    name,
+    sicil: document.getElementById('esicil').value,
+    dept: document.getElementById('edept').value,
+    title: document.getElementById('etitle').value,
+    shift: document.getElementById('eshift').value,
+    phone: document.getElementById('ephone').value,
+    hireDate: document.getElementById('ehire').value,
+    active: document.getElementById('eactive').value !== 'false'
+  });
+  save(); state.page = 'emp_list'; render();
+}
+function saveEmpEdit() {
+  const e = state.employees[state.editEmpIdx];
+  if (!e) return;
+  const name = document.getElementById('ename').value.trim();
+  if (!name) return alert('Ad Soyad giriniz');
+  e.name = name;
+  e.sicil = document.getElementById('esicil').value;
+  e.dept = document.getElementById('edept').value;
+  e.title = document.getElementById('etitle').value;
+  e.shift = document.getElementById('eshift').value;
+  e.phone = document.getElementById('ephone').value;
+  e.hireDate = document.getElementById('ehire').value;
+  e.active = document.getElementById('eactive').value !== 'false';
+  save(); state.page = 'emp_list'; render();
+}
+function deleteEmp(idx) {
+  if (!confirm('Bu çalışanı ve tüm kayıtlarını silmek istediğinize emin misiniz?')) return;
+  const emp = state.employees[idx];
+  state.requests = state.requests.filter(r => r.emp !== emp.id);
+  state.employees.splice(idx, 1);
+  save(); render();
+}
+
+function addReq() {
+  const empId = document.getElementById('remp').value;
+  const dateVal = document.getElementById('rdate').value;
+  const others = otherEmployeesOnDate(dateVal, empId);
+  if (others.length > 0) {
+    const ok = confirm(`⚠ Bu tarihte zaten ${others.length} çalışan var: ${others.join(', ')}.\n\nYine de eklemek istiyor musunuz?`);
+    if (!ok) return;
+  }
+  state.requests.push({
+    id: Date.now().toString(),
+    emp: empId,
+    type: document.getElementById('rtype').value,
+    date: dateVal,
+    time: document.getElementById('rtime').value,
+    note: document.getElementById('rnote').value,
+    status: 'Bekliyor',
+    used: false
+  });
+  save(); state.page = 'home'; render();
+}
+
+function quickAdd(empId) {
+  const type = document.getElementById('qtype_' + empId).value;
+  const dateVal = state.selectedDate;
+  const others = otherEmployeesOnDate(dateVal, empId);
+  if (others.length > 0) {
+    const ok = confirm(`⚠ Bu tarihte zaten ${others.length} çalışan var: ${others.join(', ')}.\n\nYine de eklemek istiyor musunuz?`);
+    if (!ok) return;
+  }
+  state.requests.push({ id: Date.now().toString(), emp: empId, type, date: dateVal, time: '', note: '', status: 'Onaylandı', used: false });
+  save(); render();
+}
+
+function saveLeave() {
+  const empSel = document.getElementById('lpemp');
+  const empId = empSel ? empSel.value : state.leaveEmpId;
+  const type = document.getElementById('lvtype').value;
+  const start = document.getElementById('lvstart').value;
+  const end = document.getElementById('lvend').value || start;
+  if (!start) return alert('Başlangıç tarihi giriniz');
+  if (end < start) return alert('Bitiş tarihi başlangıçtan önce olamaz');
+  state.requests.push({
+    id: Date.now().toString(), emp: empId, type, date: start, endDate: end,
+    time: '', note: document.getElementById('lvnote').value, status: 'Onaylandı', used: false
+  });
+  save();
+  state.page = empSel ? 'leave_plan_all' : 'leave_list';
+  render();
+}
+
+function deleteReq(id) {
+  if (!confirm('Bu kaydı silmek istediğinize emin misiniz?')) return;
+  state.requests = state.requests.filter(r => r.id !== id);
+  save(); render();
+}
+function setReqStatus(id, status) {
+  let req = state.requests.find(r => r.id === id);
+  if (req) { req.status = status; save(); render(); }
+}
+function toggleUsed(id) {
+  let req = state.requests.find(r => r.id === id);
+  if (req) { req.used = !req.used; save(); render(); }
+}
+
+// --- Raporlar: CSV / Excel dışa aktarma ---
+function exportReportCSV(year, month) {
+  let rows = [['Ad Soyad', 'İzin (gün)', 'Erken Çıkış (gün)', 'Cumartesi Mesaisi (gün)', 'Raporlu (gün)', 'Mazeret (gün)', 'Toplam Mesai (saat)']];
+  activeEmployees().forEach(e => {
+    const s = monthlyStats(e.id, year, month);
+    rows.push([e.name, s.izinGun, s.erken, s.cumartesi, s.raporlu, s.mazeret, s.mesaiSaat]);
+  });
+  const csv = rows.map(r => r.join(';')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `rapor_${AYLAR[month]}_${year}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// --- Yedekleme ---
+function exportBackup() {
+  const data = JSON.stringify({ employees: state.employees, requests: state.requests, exportedAt: new Date().toISOString() }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `personel_yedek_${todayStr()}.json`; a.click();
+  URL.revokeObjectURL(url);
+}
+function importBackupFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data.employees) || !Array.isArray(data.requests)) throw new Error('geçersiz');
+      if (!confirm('Mevcut veriler yedek dosyasındaki verilerle değiştirilecek. Emin misiniz?')) return;
+      state.employees = data.employees;
+      state.requests = data.requests;
+      save();
+      alert('Yedek başarıyla yüklendi.');
+      render();
+    } catch (err) {
+      alert('Geçersiz yedek dosyası.');
+    }
+  };
+  reader.readAsText(file);
+}
+function wipeAllData() {
+  if (!confirm('TÜM veriler silinecek. Bu işlem geri alınamaz. Emin misiniz?')) return;
+  if (!confirm('Son kez soruyorum: gerçekten tüm personel ve talep kayıtlarını silmek istiyor musunuz?')) return;
+  state.employees = []; state.requests = []; save(); render();
+}
+
+render();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
