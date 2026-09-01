@@ -118,7 +118,7 @@ const DOW_KISA = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
 const REQ_TYPES = ['Akşam Erken Çıkış','Cumartesi Mesaisi','Yıllık İzin','Ücretli İzin','Ücretsiz İzin','Doğum İzni','Evlilik İzni','Ölüm İzni','Sağlık/Rapor','Mazeret İzni','Diğer'];
 const TYPE_ICONS = {
   'Akşam Erken Çıkış': '🕐',
-  'Cumartesi Mesaisi': '💼',
+  'Mesai': '💼',
   'Yıllık İzin': '🏖️',
   'Ücretli İzin': '💰',
   'Ücretsiz İzin': '🚫',
@@ -130,7 +130,7 @@ const TYPE_ICONS = {
   'Diğer': '🔹'
 };
 const TYPE_COLORS = {
-  'Cumartesi Mesaisi': '#7b1fa2',
+  'Mesai': '#7b1fa2',
   'Akşam Erken Çıkış': '#f57c00',
   'Sağlık/Rapor': '#c62828',
   'Mazeret İzni': '#616161',
@@ -274,7 +274,7 @@ function usedAnnualLeaveDaysThisYear(empId) {
 
 // --- Aylık istatistik (Raporlar + ana sayfa için) ---
 function monthlyStats(empId, year, month) {
-  const stats = { izinGun: 0, erken: 0, cumartesi: 0, raporlu: 0, mazeret: 0, digerIzin: 0 };
+  const stats = { izinGun: 0, erken: 0, mesai: 0, raporlu: 0, mazeret: 0, digerIzin: 0 };
   const monthStart = new Date(year, month, 1), monthEnd = new Date(year, month + 1, 0);
   state.requests.filter(r => r.emp === empId && r.status !== 'Reddedildi').forEach(r => {
     const start = new Date(r.date), end = new Date(r.endDate || r.date);
@@ -284,12 +284,12 @@ function monthlyStats(empId, year, month) {
     const days = Math.round((overlapEnd - overlapStart) / 86400000) + 1;
     if (r.type === 'Yıllık İzin') stats.izinGun += days;
     else if (r.type === 'Akşam Erken Çıkış') stats.erken += days;
-    else if (r.type === 'Cumartesi Mesaisi') stats.cumartesi += days;
+    else if (r.type === 'Mesai') stats.mesai += days;
     else if (r.type === 'Sağlık/Rapor') stats.raporlu += days;
     else if (r.type === 'Mazeret İzni') stats.mazeret += days;
     else if (isLeaveType(r.type)) stats.digerIzin += days;
   });
-  stats.mesaiSaat = stats.cumartesi * 12;
+  stats.mesaiSaat = stats.mesai * 12;
   return stats;
 }
 
@@ -299,7 +299,7 @@ function getDailyStatus(empId, dateStr) {
   if (!r) return 'Çalışıyor';
   if (r.type === 'Yıllık İzin') return 'İzinli';
   if (r.type === 'Akşam Erken Çıkış') return 'Erken Çıkış';
-  if (r.type === 'Cumartesi Mesaisi') return 'Cumartesi Mesaisi';
+  if (r.type === 'Mesai') return 'Mesai';
   if (r.type === 'Sağlık/Rapor') return 'Raporlu';
   if (r.type === 'Mazeret İzni') return 'Mazeret';
   return r.type;
@@ -312,7 +312,7 @@ function setDailyStatus(empId, dateStr, label) {
     return;
   }
   state.requests = state.requests.filter(r => !(r.emp === empId && r.date === dateStr && (!r.endDate || r.endDate === dateStr)));
-  const map = { 'İzinli': 'Yıllık İzin', 'Erken Çıkış': 'Akşam Erken Çıkış', 'Cumartesi Mesaisi': 'Cumartesi Mesaisi', 'Raporlu': 'Sağlık/Rapor', 'Mazeret': 'Mazeret İzni' };
+  const map = { 'İzinli': 'Yıllık İzin', 'Erken Çıkış': 'Akşam Erken Çıkış', 'Mesai': 'Mesai', 'Raporlu': 'Sağlık/Rapor', 'Mazeret': 'Mazeret İzni' };
   if (label !== 'Çalışıyor') {
     state.requests.push({ id: Date.now().toString() + Math.random().toString(36).slice(2, 6), emp: empId, type: map[label], date: dateStr, endDate: dateStr, time: '', note: '', status: 'Onaylandı', used: false });
   }
@@ -605,7 +605,7 @@ function render() {
       return `
         <div class="card">
           <b>${e.name}</b><br>
-          <small>Yıllık İzin: ${s.izinGun} gün | Erken Çıkış: ${s.erken} gün | Cumartesi Mesaisi: ${s.cumartesi} gün | Sağlık/Rapor: ${s.raporlu} gün | Mazeret: ${s.mazeret} gün | Diğer İzin: ${s.digerIzin} gün</small><br>
+          <small>Yıllık İzin: ${s.izinGun} gün | Erken Çıkış: ${s.erken} gün | Mesai: ${s.mesai} gün | Sağlık/Rapor: ${s.raporlu} gün | Mazeret: ${s.mazeret} gün | Diğer İzin: ${s.digerIzin} gün</small><br>
           <small><b>Toplam Ekstra Mesai: ${s.mesaiSaat} saat</b></small>
         </div>
       `;
@@ -728,7 +728,7 @@ function renderCalendar() {
     <div class="card" style="font-size:12px">
       <span class="cal-dot" style="background:${typeColor('Yıllık İzin')}">☐AB</span> Yıllık İzin &nbsp;
       <span class="cal-dot" style="background:${typeColor('Akşam Erken Çıkış')}">AB</span> Erken Çıkış &nbsp;
-      <span class="cal-dot" style="background:${typeColor('Cumartesi Mesaisi')}">AB</span> Cumartesi Mesaisi<br>
+      <span class="cal-dot" style="background:${typeColor('Mesai')}">AB</span> Mesai<br>
       <span class="cal-dot" style="background:${typeColor('Sağlık/Rapor')}">AB</span> Sağlık/Rapor &nbsp;
       <span class="cal-dot" style="background:${typeColor('Mazeret İzni')}">AB</span> Mazeret İzni<br>
       ⏳ Bekliyor &nbsp; ⚠ Birden fazla kişi &nbsp; 🔴 Personel açığı riski
@@ -862,10 +862,10 @@ function toggleUsed(id) {
 
 // --- Raporlar: CSV / Excel dışa aktarma ---
 function exportReportCSV(year, month) {
-  let rows = [['Ad Soyad', 'Yıllık İzin (gün)', 'Erken Çıkış (gün)', 'Cumartesi Mesaisi (gün)', 'Sağlık/Rapor (gün)', 'Mazeret (gün)', 'Diğer İzin (gün)', 'Toplam Mesai (saat)']];
+  let rows = [['Ad Soyad', 'Yıllık İzin (gün)', 'Erken Çıkış (gün)', ' Mesai (gün)', 'Sağlık/Rapor (gün)', 'Mazeret (gün)', 'Diğer İzin (gün)', 'Toplam Mesai (saat)']];
   activeEmployees().forEach(e => {
     const s = monthlyStats(e.id, year, month);
-    rows.push([e.name, s.izinGun, s.erken, s.cumartesi, s.raporlu, s.mazeret, s.digerIzin, s.mesaiSaat]);
+    rows.push([e.name, s.izinGun, s.erken, s.mesai, s.raporlu, s.mazeret, s.digerIzin, s.mesaiSaat]);
   });
   const csv = rows.map(r => r.join(';')).join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
