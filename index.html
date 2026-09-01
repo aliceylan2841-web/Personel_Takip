@@ -620,7 +620,7 @@ function render() {
         <select onchange="state.repMonth=parseInt(this.value);render()">${monthOpts}</select>
         <input type="number" value="${y}" onchange="state.repYear=parseInt(this.value);render()">
       </div>
-      <button class="btn-green" onclick="exportReportCSV(${y},${m})">?? CSV / Excel'e Aktar</button>
+      <button class="btn-green" onclick="exportReportCSV(${y},${m})">📥 CSV / Excel'e Aktar</button>
       ${rows || '<p>Aktif personel yok.</p>'}
       <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>
     `;
