@@ -131,17 +131,17 @@ const TYPE_ICONS = {
   'Diğer': '🔹'
 };
 const TYPE_COLORS = {
-  'Akşam Erken Çıkış': '#f57c00',
   'Mesai': '#7b1fa2',
   'Mesai Yok': '#9e9e9e',
+  'Akşam Erken Çıkış': '#f57c00',
+  'Sağlık/Rapor': '#c62828',
+  'Mazeret İzni': '#616161',
   'Yıllık İzin': '#1565c0',
   'Ücretli İzin': '#2e7d32',
   'Ücretsiz İzin': '#795548',
   'Doğum İzni': '#ad1457',
   'Evlilik İzni': '#d81b60',
   'Ölüm İzni': '#212121',
-  'Sağlık/Rapor': '#c62828',
-  'Mazeret İzni': '#616161',
   'Diğer': '#455a64'
 };
 const todayStr = () => new Date().toISOString().split('T')[0];
@@ -276,7 +276,7 @@ function usedAnnualLeaveDaysThisYear(empId) {
 
 // --- Aylık istatistik (Raporlar + ana sayfa için) ---
 function monthlyStats(empId, year, month) {
-  const stats = { izinGun: 0, erken: 0, mesaiGun: 0, raporlu: 0, mazeret: 0, digerIzin: 0 };
+  const stats = { izinGun: 0, erken: 0, cumartesi: 0, raporlu: 0, mazeret: 0, digerIzin: 0 };
   const monthStart = new Date(year, month, 1), monthEnd = new Date(year, month + 1, 0);
   state.requests.filter(r => r.emp === empId && r.status !== 'Reddedildi').forEach(r => {
     const start = new Date(r.date), end = new Date(r.endDate || r.date);
@@ -286,21 +286,28 @@ function monthlyStats(empId, year, month) {
     const days = Math.round((overlapEnd - overlapStart) / 86400000) + 1;
     if (r.type === 'Yıllık İzin') stats.izinGun += days;
     else if (r.type === 'Akşam Erken Çıkış') stats.erken += days;
-    else if (r.type === 'Mesai') stats.mesaiGun += days;
+    else if (r.type === 'Mesai') stats.cumartesi += days;
     else if (r.type === 'Sağlık/Rapor') stats.raporlu += days;
     else if (r.type === 'Mazeret İzni') stats.mazeret += days;
     else if (isLeaveType(r.type)) stats.digerIzin += days;
   });
-  stats.mesaiSaat = stats.mesaiGun * 12;
+  stats.mesaiSaat = stats.cumartesi * 12;
   return stats;
 }
 
 // --- Günlük durum (Mesai Takibi matrisi) ---
 function getDailyStatus(empId, dateStr) {
   const r = state.requests.find(rq => rq.emp === empId && rangeIncludes(rq, dateStr) && rq.status !== 'Reddedildi');
-  return r ? r.type : 'Çalışıyor';
+  if (!r) return 'Çalışıyor';
+  if (r.type === 'Yıllık İzin') return 'İzinli';
+  if (r.type === 'Akşam Erken Çıkış') return 'Erken Çıkış';
+  if (r.type === 'Mesai') return 'Mesai';
+  if (r.type === 'Mesai Yok') return 'Mesai Yok';
+  if (r.type === 'Sağlık/Rapor') return 'Raporlu';
+  if (r.type === 'Mazeret İzni') return 'Mazeret';
+  return r.type;
 }
-function setDailyStatus(empId, dateStr, type) {
+function setDailyStatus(empId, dateStr, label) {
   const existing = state.requests.find(r => r.emp === empId && rangeIncludes(r, dateStr));
   if (existing && existing.endDate && existing.endDate !== existing.date) {
     alert('Bu tarih çok günlü bir izin planının parçası. Değiştirmek için İzin Planı sayfasından düzenleyin.');
@@ -308,8 +315,9 @@ function setDailyStatus(empId, dateStr, type) {
     return;
   }
   state.requests = state.requests.filter(r => !(r.emp === empId && r.date === dateStr && (!r.endDate || r.endDate === dateStr)));
-  if (type !== 'Çalışıyor') {
-    state.requests.push({ id: Date.now().toString() + Math.random().toString(36).slice(2, 6), emp: empId, type, date: dateStr, endDate: dateStr, time: '', note: '', status: 'Onaylandı', used: false });
+  const map = { 'İzinli': 'Yıllık İzin', 'Erken Çıkış': 'Akşam Erken Çıkış', 'Mesai': 'Mesai', 'Mesai Yok': 'Mesai Yok', 'Raporlu': 'Sağlık/Rapor', 'Mazeret': 'Mazeret İzni' };
+  if (label !== 'Çalışıyor') {
+    state.requests.push({ id: Date.now().toString() + Math.random().toString(36).slice(2, 6), emp: empId, type: map[label], date: dateStr, endDate: dateStr, time: '', note: '', status: 'Onaylandı', used: false });
   }
   save(); render();
 }
@@ -326,12 +334,15 @@ function render() {
     const earlyToday = state.requests.filter(r => r.type === 'Akşam Erken Çıkış' && r.status === 'Onaylandı' && rangeIncludes(r, today)).length;
     const y = new Date().getFullYear(), m = new Date().getMonth();
     let monthLeaveDays = 0, monthOvertimeShifts = 0;
-    emps.forEach(e => { const s = monthlyStats(e.id, y, m); monthLeaveDays += s.izinGun + s.raporlu + s.mazeret + s.digerIzin; monthOvertimeShifts += s.mesaiGun; });
-    const upcoming = state.requests.filter(r => isLeaveType(r.type) && r.status === 'Onaylandı' && r.date >= today)
+    emps.forEach(e => { const s = monthlyStats(e.id, y, m); monthLeaveDays += s.izinGun + s.raporlu + s.mazeret + s.digerIzin; monthOvertimeShifts += s.cumartesi; });
+    // Yaklaşan planlar: henüz başlamamış (tarihi gelmemiş) ve kullanılmamış her türden onaylı kayıt.
+    // Zaten başlamış/geçmiş olanlar ile "kullanıldı" işaretlenenler burada gösterilmez — bunlar artık
+    // "gerçekleşmiş durum" sayılır, "yaklaşan plan" değil.
+    const upcoming = state.requests.filter(r => r.status === 'Onaylandı' && !r.used && r.date > today)
       .sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
     let upcomingHtml = upcoming.map(r => {
       const emp = state.employees.find(e => e.id === r.emp);
-      return `<div class="req-line"><b>${emp ? emp.name : ''}</b><br>${formatRangeTR(r)}</div>`;
+      return `<div class="req-line"><b>${emp ? emp.name : ''}</b> — ${TYPE_ICONS[r.type] || ''} ${r.type}<br>${formatRangeTR(r)}</div>`;
     }).join('');
 
     root.innerHTML = `
@@ -342,11 +353,11 @@ function render() {
         🟠 Bekleyen talep: <b>${pending}</b> &nbsp; 🕐 Bugün erken çıkış: <b>${earlyToday}</b><br>
         📊 Bu ay izin: <b>${monthLeaveDays} gün</b> &nbsp; 📈 Bu ay mesai: <b>${monthOvertimeShifts * 12} saat</b>
       </div>
-      ${upcomingHtml ? `<div class="card"><b>🔔 Yaklaşan İzinler</b>${upcomingHtml}</div>` : ''}
-      <button onclick="state.page='new_req';render()">📝 TALEP OLUŞTUR</button>
-      <button onclick="state.page='calendar';render()">🗓️ TAKVİM</button>
+      ${upcomingHtml ? `<div class="card"><b>🔔 Yaklaşan Planlar</b>${upcomingHtml}</div>` : ''}
       <button onclick="state.page='leave_plan_all';render()">📅 İZİN PLANI</button>
       <button onclick="state.page='daily_status';render()">🕐 MESAİ TAKİBİ</button>
+      <button onclick="state.page='new_req';render()">📝 TALEP OLUŞTUR</button>
+      <button onclick="state.page='calendar';render()">🗓️ TAKVİM</button>
       <button onclick="state.page='emp_list';render()">👥 PERSONELLER</button>
       <button onclick="state.page='reqs_pending';render()">🔔 BEKLEYEN TALEPLER (${pending})</button>
       <button onclick="state.page='reqs_all';render()">📋 TÜM TALEPLER</button>
@@ -443,14 +454,19 @@ function render() {
     let items = state.requests.filter(r => isLeaveType(r.type)).sort((a, b) => a.date.localeCompare(b.date));
     let list = items.map(r => {
       const emp = state.employees.find(e => e.id === r.emp);
-      const upcoming = r.date >= today;
+      // Üç ayrı durum: henüz kullanılmadıysa ve tarihi gelmediyse "Yaklaşan";
+      // kullanıldı olarak işaretlendiyse "Kullanıldı"; başlamış ama işaretlenmediyse "Devam Ediyor/Geçti".
+      let statusBadge;
+      if (r.used) statusBadge = '<span class="badge badge-green">✅ Kullanıldı</span>';
+      else if (r.date > today) statusBadge = '<span class="badge badge-blue">🔔 Yaklaşan</span>';
+      else statusBadge = '<span class="badge badge-gray">⏳ Devam Ediyor / Geçti</span>';
       return `
         <div class="card">
           <b>${emp ? emp.name : 'Silinmiş'}</b> — ${r.type}<br>
           ${formatRangeTR(r)}<br>
-          <span class="badge">${r.status}</span> ${upcoming ? '<span class="badge badge-blue">Yaklaşan</span>' : ''}
+          <span class="badge">${r.status}</span> ${statusBadge}
           <div class="row2" style="margin-top:6px">
-            <button style="padding:6px;font-size:12px" onclick="toggleUsed('${r.id}')">${r.used ? '☑ Planlandı' : '☐ Planlandı'}</button>
+            <button style="padding:6px;font-size:12px" onclick="toggleUsed('${r.id}')">${r.used ? '☑ Kullanıldı (kaldır)' : '☐ Kullanıldı işaretle'}</button>
             <button class="btn-red" style="padding:6px;font-size:12px" onclick="deleteReq('${r.id}')">🗑 Sil</button>
           </div>
         </div>
@@ -504,14 +520,14 @@ function render() {
   } else if (state.page === 'daily_status') {
     const d = state.mtDate || todayStr();
     const emps = activeEmployees();
-    const opts = ['Çalışıyor', ...REQ_TYPES, 'Mesai Yok'];
+    const opts = ['Çalışıyor', 'İzinli', 'Erken Çıkış', 'Mesai', 'Mesai Yok', 'Raporlu', 'Mazeret'];
     let rows = emps.map(e => {
       const cur = getDailyStatus(e.id, d);
       return `
         <div class="quick-row">
           <span style="flex:1">${e.name}</span>
           <select onchange="setDailyStatus('${e.id}','${d}',this.value)">
-            ${opts.map(o => `<option value="${o}" ${o === cur ? 'selected' : ''}>${TYPE_ICONS[o] ? TYPE_ICONS[o] + ' ' : ''}${o}</option>`).join('')}
+            ${opts.map(o => `<option ${o === cur ? 'selected' : ''}>${o}</option>`).join('')}
           </select>
         </div>
       `;
@@ -600,7 +616,7 @@ function render() {
       return `
         <div class="card">
           <b>${e.name}</b><br>
-          <small>Yıllık İzin: ${s.izinGun} gün | Erken Çıkış: ${s.erken} gün | Mesai: ${s.mesaiGun} gün | Sağlık/Rapor: ${s.raporlu} gün | Mazeret: ${s.mazeret} gün | Diğer İzin: ${s.digerIzin} gün</small><br>
+          <small>Yıllık İzin: ${s.izinGun} gün | Erken Çıkış: ${s.erken} gün | Mesai: ${s.cumartesi} gün | Sağlık/Rapor: ${s.raporlu} gün | Mazeret: ${s.mazeret} gün | Diğer İzin: ${s.digerIzin} gün</small><br>
           <small><b>Toplam Ekstra Mesai: ${s.mesaiSaat} saat</b></small>
         </div>
       `;
@@ -612,7 +628,7 @@ function render() {
         <select onchange="state.repMonth=parseInt(this.value);render()">${monthOpts}</select>
         <input type="number" value="${y}" onchange="state.repYear=parseInt(this.value);render()">
       </div>
-      <button class="btn-green" onclick="exportReportCSV(${y},${m})">📊 CSV / Excel'e Aktar</button>
+      <button class="btn-green" onclick="exportReportCSV(${y},${m})">📥 CSV / Excel'e Aktar</button>
       ${rows || '<p>Aktif personel yok.</p>'}
       <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>
     `;
@@ -860,7 +876,7 @@ function exportReportCSV(year, month) {
   let rows = [['Ad Soyad', 'Yıllık İzin (gün)', 'Erken Çıkış (gün)', 'Mesai (gün)', 'Sağlık/Rapor (gün)', 'Mazeret (gün)', 'Diğer İzin (gün)', 'Toplam Mesai (saat)']];
   activeEmployees().forEach(e => {
     const s = monthlyStats(e.id, year, month);
-    rows.push([e.name, s.izinGun, s.erken, s.mesaiGun, s.raporlu, s.mazeret, s.digerIzin, s.mesaiSaat]);
+    rows.push([e.name, s.izinGun, s.erken, s.cumartesi, s.raporlu, s.mazeret, s.digerIzin, s.mesaiSaat]);
   });
   const csv = rows.map(r => r.join(';')).join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
