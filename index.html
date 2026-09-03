@@ -521,20 +521,42 @@ function render() {
     const d = state.mtDate || todayStr();
     const emps = activeEmployees();
     const opts = ['Çalışıyor', 'İzinli', 'Erken Çıkış', 'Mesai', 'Mesai Yok', 'Raporlu', 'Mazeret'];
+    const STATUS_STYLE = {
+      'Çalışıyor': { bg: '#e8f5e9', border: '#2e7d32', text: '#1b5e20' },
+      'İzinli': { bg: '#e3f2fd', border: '#1565c0', text: '#0d47a1' },
+      'Erken Çıkış': { bg: '#fff3e0', border: '#f57c00', text: '#e65100' },
+      'Mesai': { bg: '#f3e5f5', border: '#7b1fa2', text: '#4a148c' },
+      'Mesai Yok': { bg: '#f5f5f5', border: '#9e9e9e', text: '#616161' },
+      'Raporlu': { bg: '#ffebee', border: '#c62828', text: '#b71c1c' },
+      'Mazeret': { bg: '#efebe9', border: '#616161', text: '#3e2723' }
+    };
+    const counts = {};
+    opts.forEach(o => counts[o] = 0);
+    emps.forEach(e => { const s = getDailyStatus(e.id, d); if (counts[s] === undefined) counts[s] = 0; counts[s]++; });
+
     let rows = emps.map(e => {
       const cur = getDailyStatus(e.id, d);
+      const style = STATUS_STYLE[cur] || STATUS_STYLE['Çalışıyor'];
       return `
         <div class="quick-row">
           <span style="flex:1">${e.name}</span>
-          <select onchange="setDailyStatus('${e.id}','${d}',this.value)">
+          <select onchange="setDailyStatus('${e.id}','${d}',this.value)" style="background:${style.bg};border-color:${style.border};color:${style.text};font-weight:600">
             ${opts.map(o => `<option ${o === cur ? 'selected' : ''}>${o}</option>`).join('')}
           </select>
         </div>
       `;
     }).join('');
+
+    const STATUS_ICONS = { 'Çalışıyor': '🟢', 'İzinli': '🏖️', 'Erken Çıkış': '🕐', 'Mesai': '💼', 'Mesai Yok': '➖', 'Raporlu': '🏥', 'Mazeret': '📄' };
+    const summaryLine = opts.filter(o => counts[o] > 0).map(o => `${STATUS_ICONS[o]} ${o}: <b>${counts[o]}</b>`).join(' &nbsp; ');
+
     root.innerHTML = `
       <h2>MESAİ TAKİBİ (12 Saat)</h2>
       <input type="date" value="${d}" onchange="state.mtDate=this.value;render()">
+      <div class="card">
+        👥 Toplam: <b>${emps.length}</b><br>
+        ${summaryLine}
+      </div>
       <div class="card">${rows || '<p>Aktif çalışan yok.</p>'}</div>
       <div class="info-box">ℹ️ Bu ekran o günün durumunu tek tıkla kaydeder. Çok günlük planlanmış izinler İzin Planı'ndan yönetilir.</div>
       <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>
