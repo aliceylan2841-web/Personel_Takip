@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'mesai-takip-v1';
+const CACHE_VERSION = 'mesai-takip-v2';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -35,26 +35,45 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Cache-first for app shell, network-first fallback for everything else, offline fallback to index.html
+// App shell (index.html, manifest.json, navigasyon) her zaman ÖNCE İNTERNETTEN çekilir,
+// böylece GitHub'a attığın güncellemeler bir sonraki açılışta hemen görünür.
+// İnternet yoksa önbellekteki son kopya kullanılır (çevrimdışı çalışma için).
+const NETWORK_FIRST_FILES = ['./index.html', './manifest.json', './'];
+
+function isNetworkFirst(request) {
+  if (request.mode === 'navigate') return true;
+  return NETWORK_FIRST_FILES.some((f) => request.url.endsWith(f.replace('./', '/')) || request.url.endsWith(f));
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
+  if (isNetworkFirst(event.request)) {
+    event.respondWith(
+      fetch(event.request)
         .then((response) => {
-          if (response && response.status === 200 && response.type === 'basic') {
+          if (response && response.status === 200) {
             const clone = response.clone();
             caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, clone));
           }
           return response;
         })
-        .catch(() => {
-          if (event.request.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
-        });
+        .catch(() => caches.match(event.request).then((c) => c || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // Statik dosyalar (ikonlar vb.) için önce önbellek, yoksa internetten çek ve önbelleğe ekle
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request).then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const clone = response.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      });
     })
   );
 });
