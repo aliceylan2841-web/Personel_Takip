@@ -71,6 +71,16 @@
   .type-card .ic { font-size: 28px; display: block; margin-bottom: 6px; }
   .type-sheet-actions { display: flex; gap: 10px; margin-top: 10px; }
   .type-sheet-actions button { margin: 0; }
+
+  .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.stat{background:#fff;padding:12px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07)}.stat b{font-size:22px;display:block;color:#1e4678}.small{font-size:12px;color:#666}.pill{padding:4px 8px;border-radius:20px;background:#eee;font-size:11px;font-weight:bold}.pill-plan{background:#e3f2fd;color:#1565c0}.pill-now{background:#ffebee;color:#c62828}.table-wrap{overflow:auto}.mini-table{width:100%;border-collapse:collapse;font-size:12px}.mini-table th,.mini-table td{padding:8px 6px;border-bottom:1px solid #eee;text-align:left;white-space:nowrap}.mini-table th{background:#f5f7fa}.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.menu-grid button{margin:0}.progress{height:7px;background:#eee;border-radius:8px;overflow:hidden}.progress i{display:block;height:100%;background:#1e4678}
+
+  .hero{background:linear-gradient(135deg,#1e4678,#2f6ea9);color:#fff;border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:0 5px 18px rgba(30,70,120,.18)}
+  .hero h2{color:#fff;margin:0 0 5px}.hero .small{color:#e8f1fa}
+  .section-title{font-size:15px;font-weight:800;color:#1e4678;margin:15px 0 8px;display:flex;align-items:center;gap:7px}
+  .summary-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}.summary-tabs button{margin:0;padding:9px 5px;font-size:12px}.summary-tabs .active{background:#1e4678;color:#fff}
+  .leave-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #edf0f4}.leave-row:last-child{border-bottom:0}.leave-name{flex:1;font-weight:700}.leave-rem{font-size:12px;font-weight:800;color:#1e4678}.leave-mini{width:55px}.leave-mini .progress{margin-top:3px}
+  .quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.quick-grid button{margin:0}.dashboard-card{border-radius:14px;border:1px solid #e7ebf0;background:#fff;padding:13px;margin-bottom:10px}
+  .mode-row{display:flex;gap:7px}.mode-row button{margin:0;flex:1}.mode-row .selected{background:#1e4678;color:#fff}
 </style>
 </head>
 <body>
@@ -93,14 +103,17 @@ let state = {
   repMonth: null,
   empSearch: '',
   empDeptFilter: 'all',
-  empShowInactive: false
+  empShowInactive: false,
+  summaryMonth: new Date().getMonth(),
+  summaryYear: new Date().getFullYear(),
+  summaryEmp: 'all'
 };
 
 // Manifest kısayollarından (örn. ?page=calendar) gelen başlangıç sayfasını uygula
 (function applyStartPage() {
   const params = new URLSearchParams(window.location.search);
   const p = params.get('page');
-  const allowed = ['new_req', 'calendar', 'emp_list', 'reqs_pending', 'reqs_all', 'reports', 'settings', 'leave_plan_all', 'daily_status'];
+  const allowed = ['new_req', 'calendar', 'emp_list', 'reqs_pending', 'reqs_all', 'reports', 'settings', 'leave_plan_all', 'daily_status','unplanned','summary','employee_summary','unified_entry','leave_hub'];
   if (p && allowed.includes(p)) state.page = p;
 })();
 
@@ -275,8 +288,11 @@ function usedAnnualLeaveDaysThisYear(empId) {
 }
 
 // --- Aylık istatistik (Raporlar + ana sayfa için) ---
+function mesaiSaatiPerGun(r) {
+  return (r.hours !== undefined && r.hours !== null && r.hours !== '' && !isNaN(parseFloat(r.hours))) ? parseFloat(r.hours) : 12;
+}
 function monthlyStats(empId, year, month) {
-  const stats = { izinGun: 0, erken: 0, cumartesi: 0, raporlu: 0, mazeret: 0, digerIzin: 0 };
+  const stats = { izinGun: 0, erken: 0, cumartesi: 0, raporlu: 0, mazeret: 0, digerIzin: 0, mesaiSaat: 0 };
   const monthStart = new Date(year, month, 1), monthEnd = new Date(year, month + 1, 0);
   state.requests.filter(r => r.emp === empId && r.status !== 'Reddedildi').forEach(r => {
     const start = new Date(r.date), end = new Date(r.endDate || r.date);
@@ -286,12 +302,12 @@ function monthlyStats(empId, year, month) {
     const days = Math.round((overlapEnd - overlapStart) / 86400000) + 1;
     if (r.type === 'Yıllık İzin') stats.izinGun += days;
     else if (r.type === 'Akşam Erken Çıkış') stats.erken += days;
-    else if (r.type === 'Mesai') stats.cumartesi += days;
+    else if (r.type === 'Mesai') { stats.cumartesi += days; stats.mesaiSaat += mesaiSaatiPerGun(r) * days; }
     else if (r.type === 'Sağlık/Rapor') stats.raporlu += days;
     else if (r.type === 'Mazeret İzni') stats.mazeret += days;
     else if (isLeaveType(r.type)) stats.digerIzin += days;
   });
-  stats.mesaiSaat = stats.cumartesi * 12;
+  stats.mesaiSaat = Math.round(stats.mesaiSaat * 10) / 10;
   return stats;
 }
 
@@ -314,57 +330,97 @@ function setDailyStatus(empId, dateStr, label) {
     render();
     return;
   }
+  let dsHours;
+  if (label === 'Mesai') {
+    const input = prompt('Kaç saat mesai yapıldı?', '12');
+    if (input === null) { render(); return; }
+    dsHours = parseFloat(input);
+    if (isNaN(dsHours) || dsHours <= 0) dsHours = 12;
+  }
   state.requests = state.requests.filter(r => !(r.emp === empId && r.date === dateStr && (!r.endDate || r.endDate === dateStr)));
   const map = { 'İzinli': 'Yıllık İzin', 'Erken Çıkış': 'Akşam Erken Çıkış', 'Mesai': 'Mesai', 'Mesai Yok': 'Mesai Yok', 'Raporlu': 'Sağlık/Rapor', 'Mazeret': 'Mazeret İzni' };
   if (label !== 'Çalışıyor') {
-    state.requests.push({ id: Date.now().toString() + Math.random().toString(36).slice(2, 6), emp: empId, type: map[label], date: dateStr, endDate: dateStr, time: '', note: '', status: 'Onaylandı', used: false });
+    state.requests.push({ id: Date.now().toString() + Math.random().toString(36).slice(2, 6), emp: empId, type: map[label], date: dateStr, endDate: dateStr, time: '', note: '', status: 'Onaylandı', used: false, hours: label === 'Mesai' ? dsHours : undefined });
   }
   save(); render();
 }
 
+function isPlanned(r){ return r.planned !== false && r.eventClass !== 'plansiz'; }
+function isUnplanned(r){ return r.eventClass === 'plansiz' || r.planned === false; }
+function eventLabel(r){ return isUnplanned(r) ? 'Plansız / Son Dakika' : 'Planlı'; }
+function reqEmployee(r){ return state.employees.find(e=>e.id===r.emp); }
+function monthRange(y,m){ const a=`${y}-${String(m+1).padStart(2,'0')}-01`; const last=new Date(y,m+1,0).getDate(); const b=`${y}-${String(m+1).padStart(2,'0')}-${String(last).padStart(2,'0')}`; return [a,b]; }
+function inMonth(r,y,m){ const [a,b]=monthRange(y,m); return (r.endDate||r.date)>=a && r.date<=b; }
+function unplannedTypes(){ return ['Sağlık/Rapor','Mazeret İzni','Ücretsiz İzin','Diğer','Mesai Yok']; }
+function addUnplanned(){
+  const emp=document.getElementById('upemp').value, type=document.getElementById('uptype').value, date=document.getElementById('update').value;
+  if(!emp||!date)return alert('Personel ve tarih seçiniz.');
+  const note=document.getElementById('upnote').value, notify=document.getElementById('upnotify').value, reason=document.getElementById('upreason').value;
+  state.requests.push({id:Date.now().toString()+Math.random().toString(36).slice(2,5),emp,type,date,endDate:date,time:'',note,reason,notifyMethod:notify,eventClass:'plansiz',planned:false,status:'Onaylandı',used:true,createdAt:new Date().toISOString()});
+  save(); state.page='unplanned'; render();
+}
+function approveReq(id,status){ let r=state.requests.find(x=>x.id===id); if(r){r.status=status;r.approvedAt=new Date().toISOString();save();render();} }
+function summaryData(y,m){
+ const rows=[]; activeEmployees().forEach(e=>{let x={emp:e,name:e.name,plan:0,unplan:0,report:0,leave:0,early:0,mesai:0,mesaiSaat:0,noget:0}; state.requests.filter(r=>r.emp===e.id&&r.status!=='Reddedildi'&&inMonth(r,y,m)).forEach(r=>{const d=Math.max(1,Math.round((new Date(r.endDate||r.date)-new Date(r.date))/86400000)+1); if(isUnplanned(r))x.unplan+=d; if(r.type==='Sağlık/Rapor')x.report+=d; if(r.type==='Yıllık İzin'||isLeaveType(r.type))x.leave+=d; if(r.type==='Akşam Erken Çıkış')x.early+=d; if(r.type==='Mesai'){x.mesai+=d; x.mesaiSaat+=mesaiSaatiPerGun(r)*d;} if(r.type==='Mesai Yok')x.noget+=d; if(isPlanned(r))x.plan+=d;}); x.mesaiSaat=Math.round(x.mesaiSaat*10)/10; rows.push(x);}); return rows;
+}
+function renderUnplanned(){ const emps=activeEmployees(), list=state.requests.filter(isUnplanned).sort((a,b)=>b.date.localeCompare(a.date)); return `<h2>⚠️ PLANSIZ / SON DAKİKA</h2><div class="info-box">Rapor, son dakika izin, vardiyaya gelmeme veya geç haber verme gibi olayları burada ayrı tutabilirsiniz. Böylece planlı izin ile gerçekleşen plansız durum karışmaz.</div><div class="card"><b>Yeni Plansız Durum</b><select id="upemp">${emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('')}</select><select id="uptype">${unplannedTypes().map(t=>`<option>${t}</option>`).join('')}</select><input id="update" type="date" value="${todayStr()}"><input id="upreason" placeholder="Neden / kısa açıklama"><select id="upnotify"><option>Telefon</option><option>WhatsApp / Mesaj</option><option>Yüz yüze</option><option>Başka personel bildirdi</option><option>Bildirilmedi</option></select><input id="upnote" placeholder="Not"><button class="btn-red" onclick="addUnplanned()">⚠️ KAYDET</button></div><div class="card"><b>Son Plansız Kayıtlar</b>${list.slice(0,30).map(r=>{const e=reqEmployee(r);return `<div class="req-line"><b>${e?e.name:'?'}</b> — ${TYPE_ICONS[r.type]||''} ${r.type}<br>${formatDateTR(r.date)} <span class="pill pill-now">Plansız</span><br><span class="small">${r.reason||r.note||'Açıklama yok'} · Bildirim: ${r.notifyMethod||'-'}</span></div>`}).join('')||'<p>Kayıt yok.</p>'}</div><button onclick="state.page='summary';render()">📊 GENEL ÖZET</button><button onclick="state.page='home';render()" class="btn-gray">⬅ Ana Sayfa</button>`; }
+
+function leaveInfo(e){
+  const entitlement=annualEntitlement(e.hireDate);
+  if(entitlement===null) return {entitlement:null,used:0,remaining:null};
+  const used=usedAnnualLeaveDaysThisYear(e.id);
+  return {entitlement,used,remaining:Math.max(entitlement-used,0)};
+}
+function yearSummaryData(y){
+  const rows=[];
+  activeEmployees().forEach(e=>{let x={emp:e.id,name:e.name,plan:0,unplan:0,report:0,leave:0,early:0,mesai:0,mesaiSaat:0,noget:0};
+    state.requests.filter(r=>r.emp===e.id&&r.status!=='Reddedildi').forEach(r=>{
+      const st=new Date(r.date), en=new Date(r.endDate||r.date), ys=new Date(y,0,1), ye=new Date(y,11,31);
+      if(en<ys||st>ye)return; const a=st<ys?ys:st,b=en>ye?ye:en; const d=Math.max(1,Math.round((b-a)/86400000)+1);
+      if(isUnplanned(r))x.unplan+=d; if(r.type==='Sağlık/Rapor')x.report+=d; if(r.type==='Yıllık İzin'||isLeaveType(r.type))x.leave+=d; if(r.type==='Akşam Erken Çıkış')x.early+=d; if(r.type==='Mesai'){x.mesai+=d; x.mesaiSaat+=mesaiSaatiPerGun(r)*d;} if(r.type==='Mesai Yok')x.noget+=d; if(isPlanned(r))x.plan+=d;
+    }); x.mesaiSaat=Math.round(x.mesaiSaat*10)/10; rows.push(x);
+  }); return rows;
+}
+function addUnifiedEntry(){
+ const emp=document.getElementById('ueemp')?.value, type=document.getElementById('uetype')?.value, date=document.getElementById('uedate')?.value, end=document.getElementById('ueend')?.value||date, mode=document.getElementById('uemode')?.value||'planli', note=document.getElementById('uenote')?.value||'';
+ if(!emp||!type||!date)return alert('Personel, durum ve tarih seçiniz.'); if(end<date)return alert('Bitiş tarihi başlangıçtan önce olamaz.');
+ const hoursVal=parseFloat(document.getElementById('uehours')?.value); const hours=(!isNaN(hoursVal)&&hoursVal>0)?hoursVal:12;
+ const planned=mode==='planli'; state.requests.push({id:Date.now().toString()+Math.random().toString(36).slice(2,6),emp,type,date,endDate:end,time:'',note,planned,eventClass:planned?'planli':'plansiz',status:planned?'Bekliyor':'Onaylandı',used:!planned,hours:type==='Mesai'?hours:undefined,createdAt:new Date().toISOString()}); save(); state.page='home'; render();
+}
+function renderLeaveHub(){ const pending=state.requests.filter(r=>isPlanned(r)&&r.status==='Bekliyor').length; const upcoming=state.requests.filter(r=>isPlanned(r)&&r.status==='Onaylandı'&&!r.used&&r.date>=todayStr()).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8); const unp=state.requests.filter(isUnplanned).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8); return `<h2>📅 İZİN PLANI</h2><div class="hero"><h2>Planlı & Plansız İzin Yönetimi</h2><div class="small">Planlanan izinleri önceden planlayın, son dakika gelişen durumları ayrı takip edin.</div></div><div class="quick-grid"><button onclick="state.page='leave_plan_all';render()">📅 PLANLI İZİNLER</button><button onclick="state.page='unplanned';render()">⚠️ PLANSIZ İZİNLER</button></div><div class="section-title">📌 Planlı İzinler</div><div class="dashboard-card"><b>${pending}</b> adet onay bekleyen planlı izin${upcoming.length?'<hr>'+upcoming.map(r=>{const e=reqEmployee(r);return `<div class="req-line"><b>${e?e.name:'?'}</b> · ${r.type}<br>${formatRangeTR(r)} <span class="pill pill-plan">Planlı</span></div>`}).join(''): '<p class="small">Yaklaşan plan yok.</p>'}</div><div class="section-title">⚠️ Plansız / Son Dakika</div><div class="dashboard-card">${unp.length?unp.map(r=>{const e=reqEmployee(r);return `<div class="req-line"><b>${e?e.name:'?'}</b> · ${r.type}<br>${formatDateTR(r.date)} <span class="pill pill-now">Plansız</span></div>`}).join(''):'<p class="small">Plansız kayıt yok.</p>'}</div><button onclick="state.page='unified_entry';render()">➕ TEK GİRİŞTEN KAYIT</button><button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`; }
+function renderUnifiedEntry(){
+ const emps=activeEmployees(); return `<h2>➕ TEK GİRİŞ</h2><div class="hero"><h2>Mesai • İzin • Durum</h2><div class="small">Tüm kayıtları tek ekrandan girin. Planlı kayıtlar onaya düşer; plansız kayıtlar gerçekleşmiş durum olarak kaydedilir.</div></div><div class="dashboard-card"><select id="ueemp">${emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('')}</select><select id="uetype">${['Yıllık İzin','Ücretli İzin','Ücretsiz İzin','Sağlık/Rapor','Mazeret İzni','Diğer','Mesai','Mesai Yok','Akşam Erken Çıkış'].map(t=>`<option>${t}</option>`).join('')}</select><div class="row2"><input id="uedate" type="date" value="${todayStr()}"><input id="ueend" type="date" value="${todayStr()}"></div><label class="f">Mesai Saati (sadece "Mesai" için, varsayılan 12)</label><input id="uehours" type="number" step="0.5" min="0" value="12"><select id="uemode"><option value="planli">📅 Planlı — Onaya Gönder</option><option value="plansiz">⚠️ Plansız / Son Dakika — Gerçekleşti</option></select><input id="uenote" placeholder="Açıklama / not"><button onclick="addUnifiedEntry()">💾 KAYDI OLUŞTUR</button></div><div class="dashboard-card"><b>Hızlı işlemler</b><div class="quick-grid"><button onclick="state.page='leave_plan_all';render()">📅 İzin Planı</button><button onclick="state.page='daily_status';render()">🕐 Mesai Takibi</button><button onclick="state.page='unplanned';render()">⚠️ Plansız</button><button onclick="state.page='summary';render()">📊 Özetler</button></div></div><button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`;
+}
+function renderSummaryHub(){
+ const y=state.summaryYear,m=state.summaryMonth, tab=state.summaryTab||'monthly'; const rows=tab==='yearly'?yearSummaryData(y):summaryData(y,m); const total=k=>rows.reduce((a,x)=>a+x[k],0);
+ const title=tab==='yearly'?`${y} YILLIK ÖZET`:`${AYLAR[m]} ${y} AYLIK ÖZET`;
+ return `<h2>📊 ÖZETLER</h2><div class="summary-tabs"><button class="${tab==='monthly'?'active':''}" onclick="state.summaryTab='monthly';render()">AYLIK</button><button class="${tab==='yearly'?'active':''}" onclick="state.summaryTab='yearly';render()">YILLIK</button><button class="${tab==='person'?'active':''}" onclick="state.summaryTab='person';render()">KİŞİ BAZLI</button></div><div class="card"><div class="row2"><select onchange="state.summaryMonth=+this.value;render()">${AYLAR.map((x,i)=>`<option value="${i}" ${i===m?'selected':''}>${x}</option>`).join('')}</select><input type="number" value="${y}" onchange="state.summaryYear=+this.value;render()"></div></div>${tab==='person'?renderPersonTab(y,m):`<div class="section-title">${tab==='yearly'?'📆 Yılın Genel Durumu':'📅 Ayın Genel Durumu'}</div><div class="stat-grid"><div class="stat">👥<b>${activeEmployees().length}</b><span class="small">Aktif personel</span></div><div class="stat">🔔<b>${state.requests.filter(r=>r.status==='Bekliyor').length}</b><span class="small">Bekleyen talep</span></div><div class="stat">📅<b>${total('plan')}</b><span class="small">Planlı gün</span></div><div class="stat">⚠️<b>${total('unplan')}</b><span class="small">Plansız gün</span></div><div class="stat">🏥<b>${total('report')}</b><span class="small">Rapor günü</span></div><div class="stat">💼<b>${total('mesai')}</b><span class="small">Mesai günü</span></div><div class="stat">🕐<b>${total('early')}</b><span class="small">Erken çıkış</span></div><div class="stat">➖<b>${total('noget')}</b><span class="small">Mesai yok</span></div></div><div class="section-title">👥 Personel Özeti</div><div class="card table-wrap"><table class="mini-table"><tr><th>Personel</th><th>Planlı</th><th>Plansız</th><th>Rapor</th><th>İzin</th><th>Mesai</th><th>Erken</th></tr>${rows.map(x=>`<tr><td>${x.name}</td><td>${x.plan}</td><td>${x.unplan}</td><td>${x.report}</td><td>${x.leave}</td><td>${x.mesai}</td><td>${x.early}</td></tr>`).join('')}</table></div>`}<button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`;
+}
+function renderPersonTab(y,m){ const emp=state.summaryEmp||'all'; const rows=emp==='all'?summaryData(y,m):summaryData(y,m).filter(x=>x.emp===emp); return `<div class="dashboard-card"><select onchange="state.summaryEmp=this.value;render()"><option value="all">Tüm Personel</option>${activeEmployees().map(e=>`<option value="${e.id}" ${emp===e.id?'selected':''}>${e.name}</option>`).join('')}</select></div>${rows.map(x=>`<div class="card"><b>${x.name}</b><div class="stat-grid"><div>Planlı <b>${x.plan}</b></div><div>Plansız <b>${x.unplan}</b></div><div>Rapor <b>${x.report}</b></div><div>İzin <b>${x.leave}</b></div><div>Mesai <b>${x.mesai}</b></div><div>Erken <b>${x.early}</b></div></div></div>`).join('')}`;
+}
 function render() {
   const root = document.getElementById('app');
 
+  if (state.page === 'summary') { root.innerHTML=renderSummaryHub(); return; }
+  if (state.page === 'employee_summary') { state.summaryTab='person'; root.innerHTML=renderSummaryHub(); return; }
+  if (state.page === 'unified_entry') { root.innerHTML=renderUnifiedEntry(); return; }
+  if (state.page === 'leave_hub') { root.innerHTML=renderLeaveHub(); return; }
+  if (state.page === 'unplanned') { root.innerHTML=renderUnplanned(); return; }
+
   if (state.page === 'home') {
-    const today = todayStr();
-    const emps = activeEmployees();
-    const pending = state.requests.filter(r => r.status === 'Bekliyor').length;
-    const onLeaveToday = leaveEmpIdsOnDate(today).size;
-    const workingToday = emps.length - onLeaveToday;
-    const earlyToday = state.requests.filter(r => r.type === 'Akşam Erken Çıkış' && r.status === 'Onaylandı' && rangeIncludes(r, today)).length;
-    const y = new Date().getFullYear(), m = new Date().getMonth();
-    let monthLeaveDays = 0, monthOvertimeShifts = 0;
-    emps.forEach(e => { const s = monthlyStats(e.id, y, m); monthLeaveDays += s.izinGun + s.raporlu + s.mazeret + s.digerIzin; monthOvertimeShifts += s.cumartesi; });
-    // Yaklaşan planlar: henüz başlamamış (tarihi gelmemiş) ve kullanılmamış her türden onaylı kayıt.
-    // Zaten başlamış/geçmiş olanlar ile "kullanıldı" işaretlenenler burada gösterilmez — bunlar artık
-    // "gerçekleşmiş durum" sayılır, "yaklaşan plan" değil.
-    const upcoming = state.requests.filter(r => r.status === 'Onaylandı' && !r.used && r.date > today)
-      .sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
-    let upcomingHtml = upcoming.map(r => {
-      const emp = state.employees.find(e => e.id === r.emp);
-      return `<div class="req-line"><b>${emp ? emp.name : ''}</b> — ${TYPE_ICONS[r.type] || ''} ${r.type}<br>${formatRangeTR(r)}</div>`;
-    }).join('');
-
-    root.innerHTML = `
-      <h2>PERSONEL TAKİP</h2>
-      <div class="card">
-        👥 Personel: <b>${emps.length}</b><br>
-        🟢 Bugün çalışan: <b>${workingToday}</b> &nbsp; 🔵 Bugün izinli: <b>${onLeaveToday}</b><br>
-        🟠 Bekleyen talep: <b>${pending}</b> &nbsp; 🕐 Bugün erken çıkış: <b>${earlyToday}</b><br>
-        📊 Bu ay izin: <b>${monthLeaveDays} gün</b> &nbsp; 📈 Bu ay mesai: <b>${monthOvertimeShifts * 12} saat</b>
-      </div>
-      ${upcomingHtml ? `<div class="card"><b>🔔 Yaklaşan Planlar</b>${upcomingHtml}</div>` : ''}
-      <button onclick="state.page='leave_plan_all';render()">📅 İZİN PLANI</button>
-      <button onclick="state.page='daily_status';render()">🕐 MESAİ TAKİBİ</button>
-      <button onclick="state.page='new_req';render()">📝 TALEP OLUŞTUR</button>
-      <button onclick="state.page='calendar';render()">🗓️ TAKVİM</button>
-      <button onclick="state.page='emp_list';render()">👥 PERSONELLER</button>
-      <button onclick="state.page='reqs_pending';render()">🔔 BEKLEYEN TALEPLER (${pending})</button>
-      <button onclick="state.page='reqs_all';render()">📋 TÜM TALEPLER</button>
-      <button onclick="state.page='reports';render()">📊 RAPORLAR</button>
-      <button onclick="state.page='settings';render()">⚙️ AYARLAR</button>
-    `;
-
+    const today=todayStr(), emps=activeEmployees(), pending=state.requests.filter(r=>r.status==='Bekliyor').length;
+    const onLeaveToday=leaveEmpIdsOnDate(today).size, workingToday=emps.length-onLeaveToday;
+    const earlyToday=state.requests.filter(r=>r.type==='Akşam Erken Çıkış'&&r.status==='Onaylandı'&&rangeIncludes(r,today)).length;
+    const month=new Date().getMonth(), year=new Date().getFullYear();
+    const monthRows=summaryData(year,month), monthTotal=k=>monthRows.reduce((a,x)=>a+x[k],0);
+    const planned=state.requests.filter(r=>isPlanned(r)&&r.status==='Bekliyor').length;
+    const leaveRows=emps.map(e=>{const inf=leaveInfo(e);return {e,inf}});
+    root.innerHTML=`<div class="hero"><h2>PERSONEL TAKİP</h2><div class="small">Bugünün durumu, izin bakiyeleri ve hızlı işlemler</div></div>
+    <div class="stat-grid"><div class="stat">👥<b>${emps.length}</b><span class="small">Aktif personel</span></div><div class="stat">🟢<b>${workingToday}</b><span class="small">Bugün çalışan</span></div><div class="stat">🏖️<b>${onLeaveToday}</b><span class="small">Bugün izinli</span></div><div class="stat">🔔<b>${pending}</b><span class="small">Bekleyen talep</span></div><div class="stat">⚠️<b>${monthTotal('unplan')}</b><span class="small">Bu ay plansız</span></div><div class="stat">💼<b>${monthTotal('mesaiSaat')}</b><span class="small">Bu ay mesai saat</span></div></div>
+    <div class="section-title">🚀 Hızlı İşlemler</div><div class="quick-grid"><button onclick="state.page='unified_entry';render()">➕ TEK GİRİŞ</button><button onclick="state.page='daily_status';render()">🕐 BUGÜN / VARDİYA</button><button onclick="state.page='leave_hub';render()">📅 İZİN PLANI</button><button onclick="state.page='summary';state.summaryTab='monthly';render()">📊 ÖZETLER</button></div>
+    <div class="section-title">🏖️ İzin Kalanı</div><div class="dashboard-card">${leaveRows.map(({e,inf})=>`<div class="leave-row"><div class="leave-name">${e.name}</div><div class="leave-mini"><div class="leave-rem">${inf.remaining===null?'—':inf.remaining+' gün'}</div>${inf.entitlement!==null?`<div class="progress"><i style="width:${Math.min(100,(inf.remaining/Math.max(inf.entitlement,1))*100)}%"></i></div>`:''}</div></div>`).join('')||'<div class="small">Personel eklenmedi.</div>'}</div>
+    <div class="section-title">📌 Bugün</div><div class="card">👥 ${workingToday} çalışan · 🏖️ ${onLeaveToday} izinli · 🕐 ${earlyToday} erken çıkış<br><span class="small">${planned} planlı talep onay bekliyor.</span></div>
+    <div class="section-title">📂 Yönetim</div><div class="quick-grid"><button onclick="state.page='emp_list';render()">👥 Personeller</button><button onclick="state.page='reqs_pending';render()">🔔 Bekleyen Talepler (${pending})</button><button onclick="state.page='calendar';render()">🗓️ Takvim</button><button onclick="state.page='settings';render()">⚙️ Ayarlar</button></div>`;
   } else if (state.page === 'emp_list') {
     const today = todayStr();
     const depts = [...new Set(state.employees.map(e => e.dept).filter(Boolean))];
@@ -551,7 +607,7 @@ function render() {
     const summaryLine = opts.filter(o => counts[o] > 0).map(o => `${STATUS_ICONS[o]} ${o}: <b>${counts[o]}</b>`).join(' &nbsp; ');
 
     root.innerHTML = `
-      <h2>MESAİ TAKİBİ (12 Saat)</h2>
+      <h2>MESAİ TAKİBİ</h2>
       <input type="date" value="${d}" onchange="state.mtDate=this.value;render()">
       <div class="card">
         👥 Toplam: <b>${emps.length}</b><br>
@@ -572,6 +628,8 @@ function render() {
       ${typeSelectButton('rtype', REQ_TYPES[0], 'Talep Türü')}
       <input id="rdate" type="date" value="${prefillDate}" oninput="checkDateWarning()">
       <input id="rtime" placeholder="Saat (ör. 20:00)">
+      <label class="f">Mesai Saati (sadece "Mesai" türü için, varsayılan 12)</label>
+      <input id="rhours" type="number" step="0.5" min="0" value="12">
       <input id="rnote" placeholder="Açıklama (isteğe bağlı)">
       <div id="dateWarning"></div>
       <button class="btn-green" onclick="addReq()">📌 TALEP OLUŞTUR</button>
@@ -682,7 +740,7 @@ function renderReqCard(r) {
   return `
     <div class="card">
       <b>${emp ? emp.name : 'Silinmiş Çalışan'}</b><br>
-      ${r.type} | ${formatRangeTR(r)}<br>
+      ${r.type}${r.type === 'Mesai' && r.hours ? ' (' + r.hours + ' saat)' : ''} | ${formatRangeTR(r)}<br>
       Durum: <span class="badge">${r.status}</span> ${r.used ? '☑ KULLANILDI' : ''}<br>
       <small>${r.note || ''}</small>
       ${r.status === 'Bekliyor' ? `
@@ -727,7 +785,7 @@ function renderCalendar() {
       if (isLeaveType(r.type)) {
         dots += `<span class="cal-dot" style="background:${typeColor(r.type)};cursor:pointer;${strike}" onclick="event.stopPropagation();toggleUsed('${r.id}')">${r.used ? '☑' : '☐'}${label}</span>`;
       } else {
-        dots += `<span class="cal-dot" style="background:${typeColor(r.type)};${strike}">${prefix}${label}</span>`;
+        dots += `<span class="cal-dot" style="background:${typeColor(r.type)};${strike}" title="${r.type}${r.type === 'Mesai' && r.hours ? ' - ' + r.hours + ' saat' : ''}">${prefix}${label}</span>`;
       }
     });
     if (matches.length > 5) dots += `<span class="cal-dot" style="background:#999">+${matches.length - 5}</span>`;
@@ -837,6 +895,7 @@ function addReq() {
     const ok = confirm(`⚠ Bu tarihte zaten ${others.length} çalışan var: ${others.join(', ')}.\n\nYine de eklemek istiyor musunuz?`);
     if (!ok) return;
   }
+  const rHoursVal = parseFloat(document.getElementById('rhours').value);
   state.requests.push({
     id: Date.now().toString(),
     emp: empId,
@@ -845,7 +904,11 @@ function addReq() {
     time: document.getElementById('rtime').value,
     note: document.getElementById('rnote').value,
     status: 'Bekliyor',
-    used: false
+    used: false,
+    planned: true,
+    eventClass: 'planli',
+    hours: (!isNaN(rHoursVal) && rHoursVal > 0) ? rHoursVal : 12,
+    createdAt: new Date().toISOString()
   });
   save(); state.page = 'home'; render();
 }
@@ -858,7 +921,14 @@ function quickAdd(empId) {
     const ok = confirm(`⚠ Bu tarihte zaten ${others.length} çalışan var: ${others.join(', ')}.\n\nYine de eklemek istiyor musunuz?`);
     if (!ok) return;
   }
-  state.requests.push({ id: Date.now().toString(), emp: empId, type, date: dateVal, time: '', note: '', status: 'Onaylandı', used: false });
+  let qHours;
+  if (type === 'Mesai') {
+    const input = prompt('Kaç saat mesai yapıldı?', '12');
+    if (input === null) return;
+    qHours = parseFloat(input);
+    if (isNaN(qHours) || qHours <= 0) qHours = 12;
+  }
+  state.requests.push({ id: Date.now().toString(), emp: empId, type, date: dateVal, time: '', note: '', status: 'Onaylandı', used: false, hours: type === 'Mesai' ? qHours : undefined });
   save(); render();
 }
 
