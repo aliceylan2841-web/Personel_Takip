@@ -71,6 +71,10 @@
   .type-card .ic { font-size: 28px; display: block; margin-bottom: 6px; }
   .type-sheet-actions { display: flex; gap: 10px; margin-top: 10px; }
   .type-sheet-actions button { margin: 0; }
+  .people-sheet-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; max-height: 55vh; overflow-y: auto; }
+  .people-pill { border: 2px solid #e0e0e0; border-radius: 20px; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #333; cursor: pointer; background: #fafafa; }
+  .people-pill .sub { display: block; font-size: 11px; font-weight: 400; color: #777; margin-top: 1px; }
+  .stat[onclick] { cursor: pointer; }
 
   .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.stat{background:#fff;padding:12px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07)}.stat b{font-size:22px;display:block;color:#1e4678}.small{font-size:12px;color:#666}.pill{padding:4px 8px;border-radius:20px;background:#eee;font-size:11px;font-weight:bold}.pill-plan{background:#e3f2fd;color:#1565c0}.pill-now{background:#ffebee;color:#c62828}.table-wrap{overflow:auto}.mini-table{width:100%;border-collapse:collapse;font-size:12px}.mini-table th,.mini-table td{padding:8px 6px;border-bottom:1px solid #eee;text-align:left;white-space:nowrap}.mini-table th{background:#f5f7fa}.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.menu-grid button{margin:0}.progress{height:7px;background:#eee;border-radius:8px;overflow:hidden}.progress i{display:block;height:100%;background:#1e4678}
 
@@ -256,6 +260,63 @@ function confirmTypePicker() {
 }
 function activeEmployees() { return state.employees.filter(e => e.active !== false); }
 
+// Bugünkü/verilen tarihteki durumu doğru sınıflara ayırır:
+// Mesai ve Mesai Yok kaydı olan kişi hâlâ VARDİYADA/ÇALIŞIYOR sayılır, izinli sayılmaz.
+// Sadece gerçek izin türleri (LEAVE_TYPES) "izinli" sayılır.
+function todayBuckets(dateStr) {
+  const emps = activeEmployees();
+  const onLeave = [], working = [], mesai = [], mesaiYok = [];
+  emps.forEach(e => {
+    const r = state.requests.find(rq => rq.emp === e.id && rangeIncludes(rq, dateStr) && rq.status !== 'Reddedildi');
+    if (r && isLeaveType(r.type)) {
+      onLeave.push({ empId: e.id, name: e.name, sub: r.type });
+    } else {
+      working.push({ empId: e.id, name: e.name, sub: r ? r.type : 'Çalışıyor' });
+      if (r && r.type === 'Mesai') mesai.push({ empId: e.id, name: e.name, sub: r.hours ? r.hours + ' saat' : '' });
+      if (r && r.type === 'Mesai Yok') mesaiYok.push({ empId: e.id, name: e.name, sub: '' });
+    }
+  });
+  return { emps: emps.map(e => ({ empId: e.id, name: e.name })), onLeave, working, mesai, mesaiYok };
+}
+
+// Kişi listesini alt sayfa (bottom sheet) olarak gösterir; kişi sayısı çok olsa bile
+// sayfa uzamaz, liste kendi içinde kaydırılır ve her kişi küçük bir buton olarak görünür.
+function showPeopleSheet(title, people) {
+  let overlay = document.getElementById('peopleSheetOverlay');
+  if (!overlay) { overlay = document.createElement('div'); overlay.id = 'peopleSheetOverlay'; document.body.appendChild(overlay); }
+  overlay.className = 'type-sheet-overlay';
+  overlay.innerHTML = `
+    <div class="type-sheet">
+      <div class="type-sheet-title">${title} (${people.length})</div>
+      <div class="people-sheet-list">
+        ${people.length ? people.map(p => `<div class="people-pill" onclick="closePeopleSheet();openEmpEditById('${p.empId}')">${p.name}${p.sub ? `<span class="sub">${p.sub}</span>` : ''}</div>`).join('') : '<p class="small">Kayıt yok.</p>'}
+      </div>
+      <div class="type-sheet-actions"><button class="btn-gray" onclick="closePeopleSheet()">Kapat</button></div>
+    </div>
+  `;
+}
+function closePeopleSheet() { const o = document.getElementById('peopleSheetOverlay'); if (o) o.remove(); }
+function openEmpEditById(empId) { const idx = state.employees.findIndex(e => e.id === empId); if (idx >= 0) openEmpEdit(idx); }
+function showPeopleSheetFromState(key, title) {
+  const list = (state._todayBuckets && state._todayBuckets[key]) || [];
+  showPeopleSheet(title, list);
+}
+function showLeaveRemainingSheet() {
+  const rows = activeEmployees().map(e => ({ e, inf: leaveInfo(e) }));
+  let overlay = document.getElementById('peopleSheetOverlay');
+  if (!overlay) { overlay = document.createElement('div'); overlay.id = 'peopleSheetOverlay'; document.body.appendChild(overlay); }
+  overlay.className = 'type-sheet-overlay';
+  overlay.innerHTML = `
+    <div class="type-sheet">
+      <div class="type-sheet-title">🏖️ İzin Kalanı (${rows.length})</div>
+      <div style="max-height:60vh;overflow-y:auto;margin:10px 0">
+        ${rows.length ? rows.map(({ e, inf }) => `<div class="leave-row" style="cursor:pointer" onclick="closePeopleSheet();openEmpEditById('${e.id}')"><div class="leave-name">${e.name}</div><div class="leave-mini"><div class="leave-rem">${inf.remaining === null ? '—' : inf.remaining + ' gün'}</div>${inf.entitlement !== null ? `<div class="progress"><i style="width:${Math.min(100, (inf.remaining / Math.max(inf.entitlement, 1)) * 100)}%"></i></div>` : ''}</div></div>`).join('') : '<p class="small">Personel eklenmedi.</p>'}
+      </div>
+      <div class="type-sheet-actions"><button class="btn-gray" onclick="closePeopleSheet()">Kapat</button></div>
+    </div>
+  `;
+}
+
 function leaveEmpIdsOnDate(dateStr) {
   return new Set(state.requests.filter(r => isLeaveType(r.type) && r.status === 'Onaylandı' && rangeIncludes(r, dateStr)).map(r => r.emp));
 }
@@ -409,17 +470,19 @@ function render() {
 
   if (state.page === 'home') {
     const today=todayStr(), emps=activeEmployees(), pending=state.requests.filter(r=>r.status==='Bekliyor').length;
-    const onLeaveToday=leaveEmpIdsOnDate(today).size, workingToday=emps.length-onLeaveToday;
+    const buckets=todayBuckets(today);
+    const onLeaveToday=buckets.onLeave.length, workingToday=buckets.working.length;
     const earlyToday=state.requests.filter(r=>r.type==='Akşam Erken Çıkış'&&r.status==='Onaylandı'&&rangeIncludes(r,today)).length;
     const month=new Date().getMonth(), year=new Date().getFullYear();
     const monthRows=summaryData(year,month), monthTotal=k=>monthRows.reduce((a,x)=>a+x[k],0);
     const planned=state.requests.filter(r=>isPlanned(r)&&r.status==='Bekliyor').length;
     const leaveRows=emps.map(e=>{const inf=leaveInfo(e);return {e,inf}});
+    state._todayBuckets = buckets;
     root.innerHTML=`<div class="hero"><h2>PERSONEL TAKİP</h2><div class="small">Bugünün durumu, izin bakiyeleri ve hızlı işlemler</div></div>
-    <div class="stat-grid"><div class="stat">👥<b>${emps.length}</b><span class="small">Aktif personel</span></div><div class="stat">🟢<b>${workingToday}</b><span class="small">Bugün çalışan</span></div><div class="stat">🏖️<b>${onLeaveToday}</b><span class="small">Bugün izinli</span></div><div class="stat">🔔<b>${pending}</b><span class="small">Bekleyen talep</span></div><div class="stat">⚠️<b>${monthTotal('unplan')}</b><span class="small">Bu ay plansız</span></div><div class="stat">💼<b>${monthTotal('mesaiSaat')}</b><span class="small">Bu ay mesai saat</span></div></div>
+    <div class="stat-grid"><div class="stat" onclick="showPeopleSheetFromState('emps','Aktif Personel')">👥<b>${emps.length}</b><span class="small">Aktif personel</span></div><div class="stat" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')">🟢<b>${workingToday}</b><span class="small">Bugün vardiyada</span></div><div class="stat" onclick="showPeopleSheetFromState('onLeave','Bugün İzinli')">🏖️<b>${onLeaveToday}</b><span class="small">Bugün izinli</span></div><div class="stat" onclick="state.page='reqs_pending';render()">🔔<b>${pending}</b><span class="small">Bekleyen talep</span></div><div class="stat">⚠️<b>${monthTotal('unplan')}</b><span class="small">Bu ay plansız</span></div><div class="stat">💼<b>${monthTotal('mesaiSaat')}</b><span class="small">Bu ay mesai saat</span></div></div>
     <div class="section-title">🚀 Hızlı İşlemler</div><div class="quick-grid"><button onclick="state.page='unified_entry';render()">➕ TEK GİRİŞ</button><button onclick="state.page='daily_status';render()">🕐 BUGÜN / VARDİYA</button><button onclick="state.page='leave_hub';render()">📅 İZİN PLANI</button><button onclick="state.page='summary';state.summaryTab='monthly';render()">📊 ÖZETLER</button></div>
-    <div class="section-title">🏖️ İzin Kalanı</div><div class="dashboard-card">${leaveRows.map(({e,inf})=>`<div class="leave-row"><div class="leave-name">${e.name}</div><div class="leave-mini"><div class="leave-rem">${inf.remaining===null?'—':inf.remaining+' gün'}</div>${inf.entitlement!==null?`<div class="progress"><i style="width:${Math.min(100,(inf.remaining/Math.max(inf.entitlement,1))*100)}%"></i></div>`:''}</div></div>`).join('')||'<div class="small">Personel eklenmedi.</div>'}</div>
-    <div class="section-title">📌 Bugün</div><div class="card">👥 ${workingToday} çalışan · 🏖️ ${onLeaveToday} izinli · 🕐 ${earlyToday} erken çıkış<br><span class="small">${planned} planlı talep onay bekliyor.</span></div>
+    <button onclick="showLeaveRemainingSheet()">🏖️ İZİN KALANI (${leaveRows.length})</button>
+    <div class="section-title">📌 Bugün</div><div class="card" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')" style="cursor:pointer">🟢 ${workingToday} vardiyada · 🏖️ ${onLeaveToday} izinli · 💼 ${buckets.mesai.length} mesaili · ➖ ${buckets.mesaiYok.length} mesai yok · 🕐 ${earlyToday} erken çıkış<br><span class="small">${planned} planlı talep onay bekliyor. (Detay için dokunun)</span></div>
     <div class="section-title">📂 Yönetim</div><div class="quick-grid"><button onclick="state.page='emp_list';render()">👥 Personeller</button><button onclick="state.page='reqs_pending';render()">🔔 Bekleyen Talepler (${pending})</button><button onclick="state.page='calendar';render()">🗓️ Takvim</button><button onclick="state.page='settings';render()">⚙️ Ayarlar</button></div>`;
   } else if (state.page === 'emp_list') {
     const today = todayStr();
