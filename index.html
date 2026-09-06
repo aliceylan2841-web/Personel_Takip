@@ -268,15 +268,20 @@ function todayBuckets(dateStr) {
   const onLeave = [], working = [], mesai = [], mesaiYok = [];
   emps.forEach(e => {
     const r = state.requests.find(rq => rq.emp === e.id && rangeIncludes(rq, dateStr) && rq.status !== 'Reddedildi');
+    const shift = (e.shift || '').trim() || 'Vardiya belirtilmemiş';
     if (r && isLeaveType(r.type)) {
       onLeave.push({ empId: e.id, name: e.name, sub: r.type });
     } else {
-      working.push({ empId: e.id, name: e.name, sub: r ? r.type : 'Çalışıyor' });
+      working.push({ empId: e.id, name: e.name, sub: r ? r.type : 'Çalışıyor', shift });
       if (r && r.type === 'Mesai') mesai.push({ empId: e.id, name: e.name, sub: r.hours ? r.hours + ' saat' : '' });
       if (r && r.type === 'Mesai Yok') mesaiYok.push({ empId: e.id, name: e.name, sub: '' });
     }
   });
-  return { emps: emps.map(e => ({ empId: e.id, name: e.name })), onLeave, working, mesai, mesaiYok };
+  const shiftCounts = {};
+  working.forEach(p => { shiftCounts[p.shift] = (shiftCounts[p.shift] || 0) + 1; });
+  const leaveCounts = {};
+  onLeave.forEach(p => { leaveCounts[p.sub] = (leaveCounts[p.sub] || 0) + 1; });
+  return { emps: emps.map(e => ({ empId: e.id, name: e.name })), onLeave, working, mesai, mesaiYok, shiftCounts, leaveCounts };
 }
 
 // Kişi listesini alt sayfa (bottom sheet) olarak gösterir; kişi sayısı çok olsa bile
@@ -482,7 +487,18 @@ function render() {
     <div class="stat-grid"><div class="stat" onclick="showPeopleSheetFromState('emps','Aktif Personel')">👥<b>${emps.length}</b><span class="small">Aktif personel</span></div><div class="stat" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')">🟢<b>${workingToday}</b><span class="small">Bugün vardiyada</span></div><div class="stat" onclick="showPeopleSheetFromState('onLeave','Bugün İzinli')">🏖️<b>${onLeaveToday}</b><span class="small">Bugün izinli</span></div><div class="stat" onclick="state.page='reqs_pending';render()">🔔<b>${pending}</b><span class="small">Bekleyen talep</span></div><div class="stat">⚠️<b>${monthTotal('unplan')}</b><span class="small">Bu ay plansız</span></div><div class="stat">💼<b>${monthTotal('mesaiSaat')}</b><span class="small">Bu ay mesai saat</span></div></div>
     <div class="section-title">🚀 Hızlı İşlemler</div><div class="quick-grid"><button onclick="state.page='unified_entry';render()">➕ TEK GİRİŞ</button><button onclick="state.page='daily_status';render()">🕐 BUGÜN / VARDİYA</button><button onclick="state.page='leave_hub';render()">📅 İZİN PLANI</button><button onclick="state.page='summary';state.summaryTab='monthly';render()">📊 ÖZETLER</button></div>
     <button onclick="showLeaveRemainingSheet()">🏖️ İZİN KALANI (${leaveRows.length})</button>
-    <div class="section-title">📌 Bugün</div><div class="card" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')" style="cursor:pointer">🟢 ${workingToday} vardiyada · 🏖️ ${onLeaveToday} izinli · 💼 ${buckets.mesai.length} mesaili · ➖ ${buckets.mesaiYok.length} mesai yok · 🕐 ${earlyToday} erken çıkış<br><span class="small">${planned} planlı talep onay bekliyor. (Detay için dokunun)</span></div>
+    <div class="section-title">📌 Bugün</div><div class="card" style="padding:10px 12px;cursor:pointer" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')">
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <span class="pill" style="background:#e8f5e9;color:#2e7d32">🟢 Vardiyada ${workingToday}</span>
+        ${Object.entries(buckets.shiftCounts).map(([s,c])=>`<span class="pill">${s}: ${c}</span>`).join('')}
+        <span class="pill" style="background:#fff3e0;color:#e65100">🏖️ İzinli ${onLeaveToday}</span>
+        ${Object.entries(buckets.leaveCounts).map(([t,c])=>`<span class="pill" style="background:#ffe0e0;color:#c62828">${t}: ${c}</span>`).join('')}
+        ${buckets.mesai.length?`<span class="pill" style="background:#e3f2fd;color:#1565c0">💼 Mesai ${buckets.mesai.length}</span>`:''}
+        ${buckets.mesaiYok.length?`<span class="pill">➖ Mesai Yok ${buckets.mesaiYok.length}</span>`:''}
+        ${earlyToday?`<span class="pill">🕐 Erken Çıkış ${earlyToday}</span>`:''}
+      </div>
+      ${planned?`<div class="small" style="margin-top:6px">${planned} planlı talep onay bekliyor.</div>`:''}
+    </div>
     <div class="section-title">📂 Yönetim</div><div class="quick-grid"><button onclick="state.page='emp_list';render()">👥 Personeller</button><button onclick="state.page='reqs_pending';render()">🔔 Bekleyen Talepler (${pending})</button><button onclick="state.page='calendar';render()">🗓️ Takvim</button><button onclick="state.page='settings';render()">⚙️ Ayarlar</button></div>`;
   } else if (state.page === 'emp_list') {
     const today = todayStr();
