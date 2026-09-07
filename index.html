@@ -574,10 +574,57 @@ function summaryData(y,m){
 function renderUnplanned(){ const emps=activeEmployees(), list=state.requests.filter(isUnplanned).sort((a,b)=>b.date.localeCompare(a.date)); return `<h2>⚠️ PLANSIZ / SON DAKİKA</h2><div class="info-box">Rapor, son dakika izin, vardiyaya gelmeme veya geç haber verme gibi olayları burada ayrı tutabilirsiniz. Böylece planlı izin ile gerçekleşen plansız durum karışmaz.</div><div class="card"><b>Yeni Plansız Durum</b><select id="upemp">${emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('')}</select><select id="uptype">${unplannedTypes().map(t=>`<option>${t}</option>`).join('')}</select><input id="update" type="date" value="${todayStr()}"><input id="upreason" placeholder="Neden / kısa açıklama"><select id="upnotify"><option>Telefon</option><option>WhatsApp / Mesaj</option><option>Yüz yüze</option><option>Başka personel bildirdi</option><option>Bildirilmedi</option></select><input id="upnote" placeholder="Not"><button class="btn-red" onclick="addUnplanned()">⚠️ KAYDET</button></div><div class="card"><b>Son Plansız Kayıtlar</b>${list.slice(0,30).map(r=>{const e=reqEmployee(r);return `<div class="req-line"><b>${e?e.name:'?'}</b> — ${TYPE_ICONS[r.type]||''} ${r.type}<br>${formatDateTR(r.date)} <span class="pill pill-now">Plansız</span><br><span class="small">${r.reason||r.note||'Açıklama yok'} · Bildirim: ${r.notifyMethod||'-'}</span></div>`}).join('')||'<p>Kayıt yok.</p>'}</div><button onclick="state.page='summary';render()">📊 GENEL ÖZET</button><button onclick="state.page='home';render()" class="btn-gray">⬅ Ana Sayfa</button>`; }
 
 function leaveInfo(e){
-  const entitlement=annualEntitlement(e.hireDate);
-  if(entitlement===null) return {entitlement:null,used:0,remaining:null};
-  const used=usedAnnualLeaveDaysThisYear(e.id);
-  return {entitlement,used,remaining:Math.max(entitlement-used,0)};
+  const y = new Date().getFullYear();
+  const b = annualLeaveBalance(e, y);
+  if (b.entitlement === null) return {entitlement:null,total:null,used:0,remaining:null,opening:0};
+  return {entitlement:b.entitlement, opening:b.opening, total:b.opening+b.entitlement, used:b.used, remaining:b.closing};
+}
+function saveLeaveNote(empId, value){ const e=state.employees.find(x=>x.id===empId); if(!e) return; e.leaveNote=value; save(); }
+function empAnnualLeaveStatusNote(empId){
+  const today = todayStr();
+  const recs = state.requests.filter(r => r.emp===empId && r.type==='Yıllık İzin' && r.status!=='Reddedildi');
+  const ongoing = recs.find(r => r.date <= today && (r.endDate||r.date) >= today);
+  if (ongoing) return `🟢 Devam eden yıllık izin: ${formatDateTR(ongoing.date)}–${formatDateTR(ongoing.endDate||ongoing.date)}`;
+  const upcoming = recs.filter(r => r.date > today).sort((a,b)=>a.date.localeCompare(b.date))[0];
+  if (upcoming) return `📅 Planlanan yıllık izin: ${formatDateTR(upcoming.date)}–${formatDateTR(upcoming.endDate||upcoming.date)}`;
+  return '';
+}
+function thisYearAnnualLeaveMoves(){
+  const y = new Date().getFullYear(), today = todayStr();
+  return state.requests.filter(r => r.type==='Yıllık İzin' && r.status!=='Reddedildi' && new Date(r.date).getFullYear()===y)
+    .sort((a,b)=>b.date.localeCompare(a.date))
+    .map(r => { const e=reqEmployee(r); const status = r.status==='Bekliyor' ? 'Onay bekliyor' : ((r.endDate||r.date) < today ? 'Kullanıldı' : 'Planlandı'); return {r,e,status}; });
+}
+function renderAnnualLeaveSummary(){
+  const y = new Date().getFullYear();
+  const emps = activeEmployees();
+  const rows = emps.map(e => ({e, b: annualLeaveBalance(e,y)})).sort((a,b)=>a.e.name.localeCompare(b.e.name,'tr'));
+  const totalAll = k => rows.reduce((s,x)=> s + (x.b[k]||0), 0);
+  const moves = thisYearAnnualLeaveMoves();
+  return `<h2>🏖️ YILLIK İZİN ÖZETİ</h2>
+  <div class="hero"><h2>${y} Yılı</h2><div class="small">Sadece yıllık izin bilgileri — devir, hak, kullanılan ve kalan gün.</div>
+    <div class="hero-metrics"><div class="hero-metric"><b>${Math.round(totalAll('opening')+totalAll('entitlement'))}</b><span>Toplam hak (gün)</span></div><div class="hero-metric"><b>${Math.round(totalAll('used'))}</b><span>Kullanılan</span></div><div class="hero-metric"><b>${Math.round(totalAll('closing'))}</b><span>Kalan</span></div></div>
+  </div>
+  <div class="info-box">ℹ️ Bu ekran yalnızca <b>yıllık izin</b> ile ilgilidir. Rapor, mazeret, ücretsiz izin gibi diğer durumlar "Özetler" sayfasında yer alır. Kalan gün = Devir + Bu Yıl Hak − Kullanılan (personel düzenlemeden girilen devir/manuel açılışlar dahildir).</div>
+  <div class="section-title">👤 Personel Bazında</div>
+  ${rows.length ? rows.map(({e,b}) => {
+    const total = b.entitlement===null ? null : Math.round((b.opening+b.entitlement)*10)/10;
+    const pct = total ? Math.max(0, Math.min(100, Math.round((b.closing/Math.max(total,1))*100))) : 0;
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <b>${e.name}</b>
+        ${total!==null ? `<span class="pill pill-plan">${b.closing} gün kaldı</span>` : `<span class="small">İşe giriş tarihi yok</span>`}
+      </div>
+      ${total!==null ? `
+      <div class="small" style="margin-top:4px">Toplam: <b>${total}</b> (Devir ${b.opening} + Hak ${b.entitlement}) · Kullanılan: <b>${b.used}</b></div>
+      <div class="progress" style="margin-top:6px"><i style="width:${pct}%"></i></div>
+      ` : ''}
+      ${(() => { const note = empAnnualLeaveStatusNote(e.id); return note ? `<div class="small" style="margin-top:8px;font-weight:700;color:#1e4678">${note}</div>` : ''; })()}
+    </div>`;
+  }).join('') : '<p class="small">Aktif personel yok.</p>'}
+  <div class="section-title">📌 Bu Yılki Yıllık İzin Hareketleri</div>
+  <div class="card">${moves.length ? moves.slice(0,40).map(({r,e,status}) => `<div class="req-line"><b>${e?e.name:'?'}</b> · ${formatRangeTR(r)} <span class="pill ${status==='Planlandı'?'pill-plan':status==='Onay bekliyor'?'pill-now':''}">${status}</span></div>`).join('') : '<p class="small">Bu yıl yıllık izin kaydı yok.</p>'}</div>
+  <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`;
 }
 function yearSummaryData(y){
   const rows=[];
@@ -609,6 +656,7 @@ function renderPage() {
   const root = document.getElementById('app');
 
   if (state.page === 'summary') { root.innerHTML=renderSummaryHub(); return; }
+  if (state.page === 'annual_leave_summary') { root.innerHTML=renderAnnualLeaveSummary(); return; }
   if (state.page === 'employee_summary') { state.summaryTab='person'; root.innerHTML=renderSummaryHub(); return; }
   if (state.page === 'unified_entry') { root.innerHTML=renderUnifiedEntry(); return; }
   if (state.page === 'leave_hub') { root.innerHTML=renderLeaveHub(); return; }
@@ -637,7 +685,7 @@ function renderPage() {
     </div>
     <div class="stat-grid"><div class="stat" onclick="showPeopleSheetFromState('emps','Aktif Personel')"><span class="stat-ic ic-blue">👥</span><b>${emps.length}</b><span class="small">Aktif personel</span></div><div class="stat" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')"><span class="stat-ic ic-green">🟢</span><b>${workingToday}</b><span class="small">Bugün vardiyada</span></div><div class="stat" onclick="showPeopleSheetFromState('onLeave','Bugün İzinli')"><span class="stat-ic ic-orange">🏖️</span><b>${onLeaveToday}</b><span class="small">Bugün izinli</span></div><div class="stat" onclick="state.page='reqs_pending';render()"><span class="stat-ic ic-red">🔔</span><b>${pending}</b><span class="small">Bekleyen talep</span></div><div class="stat"><span class="stat-ic ic-orange">⚠️</span><b>${monthTotal('unplan')}</b><span class="small">Bu ay plansız</span></div><div class="stat"><span class="stat-ic ic-purple">💼</span><b>${monthTotal('mesaiSaat')}</b><span class="small">Bu ay mesai saat</span></div></div>
     <div class="section-title">🚀 Hızlı İşlemler</div><div class="quick-grid"><button onclick="state.page='unified_entry';render()">➕ TEK GİRİŞ</button><button onclick="state.page='daily_status';render()">🕐 BUGÜN / VARDİYA</button><button onclick="state.page='leave_hub';render()">📅 İZİN PLANI</button><button onclick="state.page='summary';state.summaryTab='monthly';render()">📊 ÖZETLER</button></div>
-    <button onclick="showLeaveRemainingSheet()">🏖️ İZİN KALANI (${leaveRows.length})</button>
+    <button onclick="state.page='annual_leave_summary';render()">🏖️ YILLIK İZİN ÖZETİ (${leaveRows.length})</button>
     <div class="section-title">📌 Bugün</div><div class="card" style="padding:10px 12px;cursor:pointer" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')">
       <div style="display:flex;flex-wrap:wrap;gap:6px">
         <span class="pill" style="background:#e8f5e9;color:#2e7d32">🟢 Vardiyada ${workingToday}${Object.keys(buckets.shiftCounts).length?` <span style="opacity:.75;font-weight:normal">(${Object.entries(buckets.shiftCounts).map(([s,c])=>`${s}: ${c}`).join(', ')})</span>`:''}</span>
