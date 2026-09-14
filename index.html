@@ -575,7 +575,7 @@ function approveReq(id,status){ let r=state.requests.find(x=>x.id===id); if(r){r
 function summaryData(y,m){
  const rows=[]; activeEmployees().forEach(e=>{let x={emp:e,name:e.name,plan:0,unplan:0,report:0,leave:0,early:0,mesai:0,mesaiSaat:0,noget:0}; state.requests.filter(r=>r.emp===e.id&&r.status!=='Reddedildi'&&inMonth(r,y,m)).forEach(r=>{const d=Math.max(1,Math.round((new Date(r.endDate||r.date)-new Date(r.date))/86400000)+1); if(isUnplanned(r))x.unplan+=d; if(r.type==='Sağlık/Rapor')x.report+=d; if(r.type!=='Sağlık/Rapor'&&isLeaveType(r.type))x.leave+=d; if(r.type==='Akşam Erken Çıkış')x.early+=d; if(r.type==='Mesai'){x.mesai+=d; x.mesaiSaat+=mesaiSaatiPerGun(r)*d;} if(r.type==='Mesai Yok')x.noget+=d; if(isPlanned(r))x.plan+=d;}); x.mesaiSaat=Math.round(x.mesaiSaat*10)/10; rows.push(x);}); return rows;
 }
-function renderUnplanned(){ const emps=activeEmployees(), list=state.requests.filter(isUnplanned).sort((a,b)=>b.date.localeCompare(a.date)); return `<h2>⚠️ PLANSIZ / SON DAKİKA</h2><div class="info-box">Rapor, son dakika izin, vardiyaya gelmeme veya geç haber verme gibi olayları burada ayrı tutabilirsiniz. Böylece planlı izin ile gerçekleşen plansız durum karışmaz.</div><div class="card"><b>Yeni Plansız Durum</b><select id="upemp">${emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('')}</select><select id="uptype">${unplannedTypes().map(t=>`<option>${t}</option>`).join('')}</select><input id="update" type="date" value="${todayStr()}"><input id="upreason" placeholder="Neden / kısa açıklama"><select id="upnotify"><option>Telefon</option><option>WhatsApp / Mesaj</option><option>Yüz yüze</option><option>Başka personel bildirdi</option><option>Bildirilmedi</option></select><input id="upnote" placeholder="Not"><button class="btn-red" onclick="addUnplanned()">⚠️ KAYDET</button></div><div class="card"><b>Son Plansız Kayıtlar</b>${list.slice(0,30).map(r=>{const e=reqEmployee(r);return `<div class="req-line"><b>${e?e.name:'?'}</b> — ${TYPE_ICONS[r.type]||''} ${r.type}<br>${formatDateTR(r.date)} <span class="pill pill-now">Plansız</span><br><span class="small">${r.reason||r.note||'Açıklama yok'} · Bildirim: ${r.notifyMethod||'-'}</span></div>`}).join('')||'<p>Kayıt yok.</p>'}</div><button onclick="state.page='summary';render()">📊 GENEL ÖZET</button><button onclick="state.page='home';render()" class="btn-gray">⬅ Ana Sayfa</button>`; }
+function renderUnplanned(){ const emps=activeEmployees(), list=state.requests.filter(isUnplanned).sort((a,b)=>b.date.localeCompare(a.date)); return `<h2>⚠️ PLANSIZ / SON DAKİKA</h2><div class="info-box">Rapor, son dakika izin, vardiyaya gelmeme veya geç haber verme gibi olayları burada ayrı tutabilirsiniz. Böylece planlı izin ile gerçekleşen plansız durum karışmaz.</div><div class="card"><b>Yeni Plansız Durum</b><select id="upemp">${emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('')}</select><select id="uptype">${unplannedTypes().map(t=>`<option>${t}</option>`).join('')}</select><input id="update" type="date" value="${todayStr()}"><input id="upreason" placeholder="Neden / kısa açıklama"><select id="upnotify"><option>Telefon</option><option>WhatsApp / Mesaj</option><option>Yüz yüze</option><option>Başka personel bildirdi</option><option>Bildirilmedi</option></select><input id="upnote" placeholder="Not"><button class="btn-red" onclick="addUnplanned()">⚠️ KAYDET</button></div><div class="card"><b>Son Plansız Kayıtlar</b>${list.slice(0,30).map(r=>{const e=reqEmployee(r);return `<div class="req-line"><b>${e?e.name:'?'}</b> — ${TYPE_ICONS[r.type]||''} ${r.type}<br>${formatDateTR(r.date)} <span class="pill pill-now">Plansız</span><br><span class="small">${r.reason||r.note||'Açıklama yok'} · Bildirim: ${r.notifyMethod||'-'}</span><div class="row2" style="margin-top:6px"><button class="btn-gray" style="padding:6px;font-size:12px" onclick="openReqEdit('${r.id}','unplanned')">✏️ Düzenle</button><button class="btn-red" style="padding:6px;font-size:12px" onclick="deleteReq('${r.id}')">🗑 Sil</button></div></div>`}).join('')||'<p>Kayıt yok.</p>'}</div><button onclick="state.page='summary';render()">📊 GENEL ÖZET</button><button onclick="state.page='home';render()" class="btn-gray">⬅ Ana Sayfa</button>`; }
 
 function leaveInfo(e){
   const y = new Date().getFullYear();
@@ -664,23 +664,10 @@ function addUnifiedEntry(){
 }
 function openUnifiedEntry(){ state.ueMode='gunluk'; state.page='unified_entry'; render(); }
 function renderLeaveHub(){
-  const y = new Date().getFullYear();
-  const items = state.requests.filter(r => r.type === 'Yıllık İzin').sort((a,b) => a.date.localeCompare(b.date));
-  const upcoming = items.filter(r => (r.endDate||r.date) >= todayStr()).slice(0,8);
-  return `<h2>🏖️ YILLIK İZİN PLANI</h2>
-    <div class="hero"><h2>${y} Yıllık İzin Planı</h2>
-      <div class="small">Bu ekran sadece yıllık izin planlamak ve takip etmek içindir. Diğer tüm izin, mesai ve durum kayıtlarını <b>İzin Girişi</b> ekranından girebilirsiniz.</div>
-    </div>
-    <div class="quick-grid">
-      <button onclick="state.page='leave_plan_all';render()">📅 YILLIK İZİN PLANLARI</button>
-      <button onclick="openUnifiedEntry()">➕ İZİN GİRİŞİ</button>
-    </div>
-    <div class="section-title">📌 Yaklaşan Yıllık İzinler</div>
-    <div class="dashboard-card">${upcoming.length ? upcoming.map(r=>{
-      const e=reqEmployee(r);
-      return `<div class="req-line"><b>${e?e.name:'?'}</b> · 🏖️ Yıllık İzin<br>${formatRangeTR(r)} <span class="pill pill-plan">${r.status||'Onaylandı'}</span></div>`;
-    }).join('') : '<p class="small">Yaklaşan yıllık izin planı yok.</p>'}</div>
+  return `<h2>🏖️ YILLIK İZİN PLANI GİRİŞ</h2>
+    <div class="info-box">Bu ekran sadece yıllık izin planlamak içindir. Diğer tüm izin, mesai ve durum kayıtlarını <b>İzin Girişi</b> ekranından girebilirsiniz.</div>
     <button class="btn-green" onclick="state.page='leave_plan_add';render()">➕ YENİ YILLIK İZİN PLANLA</button>
+    <button onclick="state.page='leave_plan_all';render()">📅 YILLIK İZİN PLANLARI</button>
     <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`;
 }
 
@@ -708,12 +695,55 @@ function renderUnifiedEntry(){
  `}
  <label class="f">Mesai Saati (sadece "Mesai" için, varsayılan 12)</label><input id="uehours" type="number" step="0.5" min="0" value="12"><input id="uenote" placeholder="Açıklama / not"><button onclick="addUnifiedEntry()">💾 KAYDI OLUŞTUR</button></div><div class="dashboard-card"><b>Hızlı işlemler</b><div class="quick-grid"><button onclick="state.page='leave_plan_all';render()">📅 İzin Planı</button><button onclick="state.page='daily_status';render()">🕐 Mesai Takibi</button><button onclick="state.page='unplanned';render()">⚠️ Plansız</button><button onclick="state.page='summary';render()">📊 Özetler</button></div></div><button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`;
 }
+function renderPersonnelWideCards(rows, y, m, tab) {
+  return rows.map(x => {
+    const info = leaveInfo(x.emp);
+    return `
+      <div class="card">
+        <b>${x.name}</b>
+        <div class="stat-grid" style="margin-top:6px">
+          <div class="stat">📅<b>${x.plan}</b><span class="small">Planlı gün</span></div>
+          <div class="stat">⚠️<b>${x.unplan}</b><span class="small">Plansız gün</span></div>
+          <div class="stat">🏥<b>${x.report}</b><span class="small">Rapor günü</span></div>
+          <div class="stat">🏖️<b>${x.leave}</b><span class="small">İzin günü</span></div>
+          <div class="stat">💼<b>${x.mesai}</b><span class="small">Mesai günü</span></div>
+          <div class="stat">🕐<b>${x.early}</b><span class="small">Erken çıkış</span></div>
+          <div class="stat">➖<b>${x.noget}</b><span class="small">Mesai yok</span></div>
+          <div class="stat">⏱️<b>${x.mesaiSaat}</b><span class="small">Mesai saati</span></div>
+        </div>
+        ${info.entitlement !== null ? `
+          <div class="small" style="margin-top:8px">
+            🏖️ Yıllık İzin — Hak: <b>${info.entitlement}</b> | Devir: <b>${info.opening}</b> | Kullanılan: <b>${info.used}</b> | Kalan: <b>${info.remaining}</b>
+          </div>
+        ` : ''}
+        <button style="margin-top:8px" onclick="showEmpMonthDetail('${x.emp.id}',${y},${m})">🔍 Detaylı Kayıtları Gör</button>
+      </div>
+    `;
+  }).join('') || '<p class="small">Kayıt yok.</p>';
+}
 function renderSummaryHub(){
  const y=state.summaryYear,m=state.summaryMonth, tab=state.summaryTab||'monthly'; const rows=tab==='yearly'?yearSummaryData(y):summaryData(y,m); const total=k=>rows.reduce((a,x)=>a+x[k],0);
  const title=tab==='yearly'?`${y} YILLIK ÖZET`:`${AYLAR[m]} ${y} AYLIK ÖZET`;
- return `<h2>📊 ÖZETLER</h2><div class="summary-tabs"><button class="${tab==='monthly'?'active':''}" onclick="state.summaryTab='monthly';render()">AYLIK</button><button class="${tab==='yearly'?'active':''}" onclick="state.summaryTab='yearly';render()">YILLIK</button><button class="${tab==='person'?'active':''}" onclick="state.summaryTab='person';render()">KİŞİ BAZLI</button></div><div class="card"><div class="row2"><select onchange="state.summaryMonth=+this.value;render()">${AYLAR.map((x,i)=>`<option value="${i}" ${i===m?'selected':''}>${x}</option>`).join('')}</select><input type="number" value="${y}" onchange="state.summaryYear=+this.value;render()"></div>${tab!=='person'?`<div class="row2" style="margin-top:8px"><button class="btn-green" onclick="exportReportExcel(${y},${m})">📊 EXCEL'E GÖNDER</button><button onclick="exportReportCSV(${y},${m})">📥 CSV</button></div><div class="small" style="margin-top:6px">Seçili ayın Personel Özeti (izin dahil) Excel olarak dışa aktarılır.</div>`:''}</div>${tab==='person'?renderPersonTab(y,m):`<div class="section-title">${tab==='yearly'?'📆 Yılın Genel Durumu':'📅 Ayın Genel Durumu'}</div><div class="stat-grid"><div class="stat">👥<b>${activeEmployees().length}</b><span class="small">Aktif personel</span></div><div class="stat">🔔<b>${state.requests.filter(r=>r.status==='Bekliyor').length}</b><span class="small">Bekleyen talep</span></div><div class="stat">📅<b>${total('plan')}</b><span class="small">Planlı gün</span></div><div class="stat">⚠️<b>${total('unplan')}</b><span class="small">Plansız gün</span></div><div class="stat">🏥<b>${total('report')}</b><span class="small">Rapor günü</span></div><div class="stat">💼<b>${total('mesai')}</b><span class="small">Mesai günü</span></div><div class="stat">🕐<b>${total('early')}</b><span class="small">Erken çıkış</span></div><div class="stat">➖<b>${total('noget')}</b><span class="small">Mesai yok</span></div></div><div class="section-title">👥 Personel Özeti</div><div class="small" style="margin:0 0 6px">Detay için bir satıra dokunun.</div><div class="card table-wrap"><table class="mini-table"><tr><th>Personel</th><th>Planlı</th><th>Plansız</th><th>Rapor</th><th>İzin</th><th>Mesai</th><th>Erken</th></tr>${rows.map(x=>`<tr onclick="showEmpMonthDetail('${x.emp.id}',${y},${m})" style="cursor:pointer"><td>${x.name}</td><td>${x.plan}</td><td>${x.unplan}</td><td>${x.report}</td><td>${x.leave}</td><td>${x.mesai}</td><td>${x.early}</td></tr>`).join('')}</table></div>`}<button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`;
+ const wide = !!state.summaryWide;
+ return `<h2>📊 ÖZETLER</h2>
+   <div class="summary-tabs"><button class="${tab==='monthly'?'active':''}" onclick="state.summaryTab='monthly';render()">AYLIK</button><button class="${tab==='yearly'?'active':''}" onclick="state.summaryTab='yearly';render()">YILLIK</button><button class="${tab==='person'?'active':''}" onclick="state.summaryTab='person';render()">KİŞİ BAZLI</button></div>
+   ${tab!=='person' ? `<div class="row2"><button class="${wide?'btn-green':''}" onclick="state.summaryWide=!state.summaryWide;render()">${wide?'📋 Tabloya Dön':'👥 PERSONEL ÖZETİ'}</button><button onclick="state.summaryTab='person';render()">🔎 KİŞİ ÖZETLE</button></div>` : ''}
+   <div class="card"><div class="row2"><select onchange="state.summaryMonth=+this.value;render()">${AYLAR.map((x,i)=>`<option value="${i}" ${i===m?'selected':''}>${x}</option>`).join('')}</select><input type="number" value="${y}" onchange="state.summaryYear=+this.value;render()"></div>${tab!=='person'?`<div class="row2" style="margin-top:8px"><button class="btn-green" onclick="exportReportExcel(${y},${m})">📊 EXCEL'E GÖNDER</button><button onclick="exportReportCSV(${y},${m})">📥 CSV</button></div><div class="small" style="margin-top:6px">Seçili ayın Personel Özeti (izin dahil) Excel olarak dışa aktarılır.</div>`:''}</div>
+   ${tab==='person' ? renderPersonTab(y,m) : `
+     <div class="section-title">${tab==='yearly'?'📆 Yılın Genel Durumu':'📅 Ayın Genel Durumu'}</div>
+     <div class="stat-grid"><div class="stat">👥<b>${activeEmployees().length}</b><span class="small">Aktif personel</span></div><div class="stat">🔔<b>${state.requests.filter(r=>r.status==='Bekliyor').length}</b><span class="small">Bekleyen talep</span></div><div class="stat">📅<b>${total('plan')}</b><span class="small">Planlı gün</span></div><div class="stat">⚠️<b>${total('unplan')}</b><span class="small">Plansız gün</span></div><div class="stat">🏥<b>${total('report')}</b><span class="small">Rapor günü</span></div><div class="stat">💼<b>${total('mesai')}</b><span class="small">Mesai günü</span></div><div class="stat">🕐<b>${total('early')}</b><span class="small">Erken çıkış</span></div><div class="stat">➖<b>${total('noget')}</b><span class="small">Mesai yok</span></div></div>
+     <div class="section-title">👥 Personel Özeti</div>
+     ${wide ? `
+       <div class="small" style="margin:0 0 6px">Her personelin tüm ay/yıl detayları aşağıda — daha fazlası için karta dokunun.</div>
+       ${renderPersonnelWideCards(rows, y, m, tab)}
+     ` : `
+       <div class="small" style="margin:0 0 6px">Detay için bir satıra dokunun, geniş görünüm için üstteki butonu kullanın.</div>
+       <div class="card table-wrap"><table class="mini-table"><tr><th>Personel</th><th>Planlı</th><th>Plansız</th><th>Rapor</th><th>İzin</th><th>Mesai</th><th>Erken</th></tr>${rows.map(x=>`<tr onclick="showEmpMonthDetail('${x.emp.id}',${y},${m})" style="cursor:pointer"><td>${x.name}</td><td>${x.plan}</td><td>${x.unplan}</td><td>${x.report}</td><td>${x.leave}</td><td>${x.mesai}</td><td>${x.early}</td></tr>`).join('')}</table></div>
+     `}
+   `}
+   <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`;
 }
-function renderPersonTab(y,m){ const emp=state.summaryEmp||'all'; const rows=emp==='all'?summaryData(y,m):summaryData(y,m).filter(x=>x.emp===emp); return `<div class="dashboard-card"><select onchange="state.summaryEmp=this.value;render()"><option value="all">Tüm Personel</option>${activeEmployees().map(e=>`<option value="${e.id}" ${emp===e.id?'selected':''}>${e.name}</option>`).join('')}</select><div class="row2" style="margin-top:10px"><button class="btn-green" onclick="exportReportExcel(${y},${m})">📊 EXCEL'E GÖNDER</button><button onclick="exportReportCSV(${y},${m})">📥 CSV</button></div><div class="small" style="margin-top:6px">Seçili ayın Personel Özeti Excel olarak dışa aktarılır.</div></div>${rows.map(x=>`<div class="card"><b>${x.name}</b><div class="stat-grid"><div>Planlı <b>${x.plan}</b></div><div>Plansız <b>${x.unplan}</b></div><div>Rapor <b>${x.report}</b></div><div>İzin <b>${x.leave}</b></div><div>Mesai <b>${x.mesai}</b></div><div>Erken <b>${x.early}</b></div></div></div>`).join('')}`; }
+function renderPersonTab(y,m){ const emp=state.summaryEmp||'all'; const rows=emp==='all'?summaryData(y,m):summaryData(y,m).filter(x=>x.emp===emp); return `<div class="dashboard-card"><select onchange="state.summaryEmp=this.value;render()"><option value="all">Tüm Personel</option>${activeEmployees().map(e=>`<option value="${e.id}" ${emp===e.id?'selected':''}>${e.name}</option>`).join('')}</select><div class="row2" style="margin-top:10px"><button class="btn-green" onclick="exportReportExcel(${y},${m})">📊 EXCEL'E GÖNDER</button><button onclick="exportReportCSV(${y},${m})">📥 CSV</button></div><div class="small" style="margin-top:6px">Seçili ayın Personel Özeti Excel olarak dışa aktarılır.</div></div>${renderPersonnelWideCards(rows,y,m,'person')}`; }
 function renderPage() {
   const root = document.getElementById('app');
 
@@ -746,7 +776,7 @@ function renderPage() {
       </div>
     </div>
     <div class="stat-grid"><div class="stat" onclick="showPeopleSheetFromState('emps','Aktif Personel')"><span class="stat-ic ic-blue">👥</span><b>${emps.length}</b><span class="small">Aktif personel</span></div><div class="stat" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')"><span class="stat-ic ic-green">🟢</span><b>${workingToday}</b><span class="small">Bugün vardiyada</span></div><div class="stat" onclick="showPeopleSheetFromState('onLeave','Bugün İzinli')"><span class="stat-ic ic-orange">🏖️</span><b>${onLeaveToday}</b><span class="small">Bugün izinli</span></div><div class="stat" onclick="state.page='reqs_pending';render()"><span class="stat-ic ic-red">🔔</span><b>${pending}</b><span class="small">Bekleyen talep</span></div><div class="stat"><span class="stat-ic ic-orange">⚠️</span><b>${monthTotal('unplan')}</b><span class="small">Bu ay plansız</span></div><div class="stat"><span class="stat-ic ic-purple">💼</span><b>${monthTotal('mesaiSaat')}</b><span class="small">Bu ay mesai saat</span></div></div>
-    <div class="section-title">🚀 Hızlı İşlemler</div><div class="quick-grid"><button onclick="openUnifiedEntry()">➕ İZİN GİRİŞİ</button><button onclick="state.page='daily_status';render()">🕐 BUGÜN / VARDİYA</button><button onclick="state.page='leave_hub';render()">🏖️ YILLIK İZİN PLANI</button><button onclick="state.page='summary';state.summaryTab='monthly';render()">📊 ÖZETLER</button></div>
+    <div class="section-title">🚀 Hızlı İşlemler</div><div class="quick-grid"><button onclick="openUnifiedEntry()">➕ İZİN GİRİŞİ</button><button onclick="state.page='daily_status';render()">🕐 BUGÜN / VARDİYA</button><button onclick="state.page='leave_hub';render()">🏖️ YILLIK İZİN PLANI GİRİŞ</button><button onclick="state.page='summary';state.summaryTab='monthly';render()">📊 ÖZETLER</button></div>
     <button onclick="state.page='annual_leave_summary';render()">🏖️ YILLIK İZİN ÖZETİ (${leaveRows.length})</button>
     <div class="section-title">📌 Bugün</div><div class="card" style="padding:10px 12px;cursor:pointer" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')">
       <div style="display:flex;flex-wrap:wrap;gap:6px">
@@ -871,7 +901,7 @@ function renderPage() {
           <span class="badge">${r.status}</span> ${statusBadge}
           <div class="row2" style="margin-top:6px">
             <button style="padding:6px;font-size:12px" onclick="toggleUsed('${r.id}')">${r.used ? '☑ Kullanıldı (kaldır)' : '☐ Kullanıldı işaretle'}</button>
-            <button class="btn-gray" style="padding:6px;font-size:12px" onclick="openReqEdit('${r.id}')">✏️ Düzenle</button>
+            <button class="btn-gray" style="padding:6px;font-size:12px" onclick="openReqEdit('${r.id}','leave_plan_all')">✏️ Düzenle</button>
             <button class="btn-red" style="padding:6px;font-size:12px" onclick="deleteReq('${r.id}')">🗑 Sil</button>
           </div>
         </div>
@@ -913,7 +943,7 @@ function renderPage() {
         Durum: <span class="badge">${r.status}</span> ${r.used ? '☑ KULLANILDI' : ''}
         <div class="row2" style="margin-top:6px">
           <button style="padding:6px;font-size:12px" onclick="toggleUsed('${r.id}')">${r.used ? '☐ Kullanılmadı işaretle' : '☑ Kullanıldı işaretle'}</button>
-          <button class="btn-gray" style="padding:6px;font-size:12px" onclick="openReqEdit('${r.id}')">✏️ Düzenle</button>
+          <button class="btn-gray" style="padding:6px;font-size:12px" onclick="openReqEdit('${r.id}','leave_list')">✏️ Düzenle</button>
           <button class="btn-red" style="padding:6px;font-size:12px" onclick="deleteReq('${r.id}')">🗑 Sil</button>
         </div>
       </div>
@@ -994,6 +1024,7 @@ function renderPage() {
     const r = state.requests.find(x => x.id === state.editReqId);
     if (!r) { state.page='reqs_all'; render(); return; }
     const isAnnual = r.type === 'Yıllık İzin';
+    const isUnp = isUnplanned(r);
     root.innerHTML = `
       <h2>✏️ KAYDI DÜZENLE</h2>
       <div class="card">
@@ -1001,13 +1032,19 @@ function renderPage() {
         <label class="f">Personel</label>
         <select id="eremp">${state.employees.map(e=>`<option value="${e.id}" ${e.id===r.emp?'selected':''}>${e.name}</option>`).join('')}</select>
         <label class="f">Kayıt Türü</label>
-        ${isAnnual ? `<div class="type-select-btn" style="cursor:default">🏖️ Yıllık İzin</div>` : `<select id="ertype">${REQ_TYPES.map(t=>`<option ${t===r.type?'selected':''}>${t}</option>`).join('')}</select>`}
+        ${isAnnual ? `<div class="type-select-btn" style="cursor:default">🏖️ Yıllık İzin</div>` : `<select id="ertype">${(isUnp ? unplannedTypes() : REQ_TYPES).map(t=>`<option ${t===r.type?'selected':''}>${t}</option>`).join('')}</select>`}
         <label class="f">Başlangıç Tarihi</label>
         <input id="erdate" type="date" value="${r.date||''}">
         <label class="f">Bitiş Tarihi</label>
         <input id="erend" type="date" value="${r.endDate||r.date||''}">
         <label class="f">Mesai Saati</label>
         <input id="erhours" type="number" step="0.5" min="0" value="${r.hours ?? 12}">
+        ${isUnp ? `
+          <label class="f">Neden / kısa açıklama</label>
+          <input id="erreason" placeholder="Neden" value="${(r.reason||'').replace(/"/g,'&quot;')}">
+          <label class="f">Bildirim</label>
+          <select id="ernotify">${['Telefon','WhatsApp / Mesaj','Yüz yüze','Başka personel bildirdi','Bildirilmedi'].map(o=>`<option ${o===r.notifyMethod?'selected':''}>${o}</option>`).join('')}</select>
+        ` : ''}
         <input id="ernote" placeholder="Açıklama / not" value="${(r.note||'').replace(/"/g,'&quot;')}">
         <button class="btn-green" onclick="saveReqEdit()">💾 DEĞİŞİKLİKLERİ KAYDET</button>
         <button class="btn-gray" onclick="cancelReqEdit()">⬅ İptal</button>
@@ -1018,7 +1055,7 @@ function renderPage() {
     const isPending = state.page === 'reqs_pending';
     let filtered = state.requests.filter(r => isPending ? r.status === 'Bekliyor' : true)
       .sort((a, b) => a.date.localeCompare(b.date));
-    let list = filtered.map(r => renderReqCard(r)).join('');
+    let list = filtered.map(r => renderReqCard(r, state.page)).join('');
     root.innerHTML = `
       <h2>${isPending ? 'BEKLEYEN TALEPLER' : 'TÜM TALEPLER'}</h2>
       ${list || '<p>Kayıt bulunamadı.</p>'}
@@ -1031,7 +1068,7 @@ function renderPage() {
   } else if (state.page === 'day_detail') {
     let matches = state.requests.filter(r => rangeIncludes(r, state.selectedDate))
       .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-    let list = matches.map(r => renderReqCard(r)).join('');
+    let list = matches.map(r => renderReqCard(r, 'day_detail')).join('');
 
     let bookedEmpIds = new Set(matches.map(r => r.emp));
     let freeEmployees = state.employees.filter(e => !bookedEmpIds.has(e.id));
@@ -1170,7 +1207,7 @@ window.addEventListener('popstate', (e) => {
   _navSyncing = false;
 });
 
-function renderReqCard(r) {
+function renderReqCard(r, returnPage) {
   let emp = state.employees.find(e => e.id === r.emp);
   return `
     <div class="card">
@@ -1188,7 +1225,7 @@ function renderReqCard(r) {
         <button style="padding:6px;margin-top:6px" onclick="toggleUsed('${r.id}')">${r.used ? '☐ Kullanılmadı olarak işaretle' : '☑ Kullanıldı olarak işaretle'}</button>
       ` : ''}
       <div class="row2" style="margin-top:6px">
-        <button class="btn-gray" style="padding:7px;font-size:12px" onclick="openReqEdit('${r.id}')">✏️ Düzenle</button>
+        <button class="btn-gray" style="padding:7px;font-size:12px" onclick="openReqEdit('${r.id}','${returnPage || 'reqs_all'}')">✏️ Düzenle</button>
         <button class="btn-red" style="padding:7px;font-size:12px" onclick="deleteReq('${r.id}')">🗑 Sil</button>
       </div>
     </div>
@@ -1277,15 +1314,16 @@ function viewDay(dateStr) { state.selectedDate = dateStr; state.page = 'day_deta
 function openEmpEdit(idx) { state.editEmpIdx = idx; state.page = 'emp_edit'; render(); }
 function openLeaveAdd(empId) { state.leaveEmpId = empId; state.page = 'leave_add'; render(); }
 function openLeaveList(empId) { state.leaveEmpId = empId; state.page = 'leave_list'; render(); }
-function openReqEdit(id) {
+function openReqEdit(id, returnPage) {
   if (!state.requests.some(r => r.id === id)) return;
   state.editReqId = id;
+  state.editReqReturnPage = returnPage || 'reqs_all';
   state.page = 'req_edit';
   render();
 }
 function cancelReqEdit() {
   state.editReqId = null;
-  state.page = 'reqs_all';
+  state.page = state.editReqReturnPage || 'reqs_all';
   render();
 }
 function saveReqEdit() {
@@ -1303,8 +1341,12 @@ function saveReqEdit() {
   }
   const hours = parseFloat(document.getElementById('erhours').value);
   if (r.type === 'Mesai' && !isNaN(hours) && hours > 0) r.hours = hours;
+  const reasonEl = document.getElementById('erreason');
+  if (reasonEl) r.reason = reasonEl.value.trim();
+  const notifyEl = document.getElementById('ernotify');
+  if (notifyEl) r.notifyMethod = notifyEl.value;
   r.note = document.getElementById('ernote').value.trim();
-  save(); state.editReqId = null; state.page = 'reqs_all'; render();
+  save(); state.editReqId = null; state.page = state.editReqReturnPage || 'reqs_all'; render();
 }
 
 function checkDateWarning() {
