@@ -249,6 +249,9 @@ function daysInclusive(start, end) {
   return Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
 }
 function formatRangeTR(r) {
+  if (r.time && r.endTime) {
+    return `${formatDateTR(r.date)}, ${r.time} – ${r.endTime}`;
+  }
   if (r.endDate && r.endDate !== r.date) {
     return `${formatDateTR(r.date)} → ${formatDateTR(r.endDate)} (${daysInclusive(r.date, r.endDate)} gün)`;
   }
@@ -637,14 +640,52 @@ function yearSummaryData(y){
   }); return rows;
 }
 function addUnifiedEntry(){
- const emp=document.getElementById('ueemp')?.value, type=document.getElementById('uetype')?.value, date=document.getElementById('uedate')?.value, end=document.getElementById('ueend')?.value||date, mode=document.getElementById('uemode')?.value||'planli', note=document.getElementById('uenote')?.value||'';
- if(!emp||!type||!date)return alert('Personel, durum ve tarih seçiniz.'); if(end<date)return alert('Bitiş tarihi başlangıçtan önce olamaz.');
+ const emp=document.getElementById('ueemp')?.value, type=document.getElementById('uetype')?.value, mode=document.getElementById('uemode')?.value||'planli', note=document.getElementById('uenote')?.value||'';
+ if(!emp||!type)return alert('Personel ve durum seçiniz.');
+ const ueMode = state.ueMode || 'gunluk';
+ let date, end, time='', endTime='';
+ if (ueMode === 'saatlik') {
+   date = document.getElementById('uedate')?.value;
+   end = date;
+   time = document.getElementById('uestarttime')?.value || '';
+   endTime = document.getElementById('ueendtime')?.value || '';
+   if (!date) return alert('Tarih seçiniz.');
+   if (!time || !endTime) return alert('Başlangıç ve bitiş saati giriniz.');
+   if (endTime <= time) return alert('Bitiş saati başlangıç saatinden sonra olmalı.');
+ } else {
+   date = document.getElementById('uedate')?.value;
+   end = document.getElementById('ueend')?.value || date;
+   if (!date) return alert('Başlangıç tarihi seçiniz.');
+   if (end < date) return alert('Bitiş tarihi başlangıçtan önce olamaz.');
+ }
  const hoursVal=parseFloat(document.getElementById('uehours')?.value); const hours=(!isNaN(hoursVal)&&hoursVal>0)?hoursVal:12;
- const planned=mode==='planli'; state.requests.push({id:Date.now().toString()+Math.random().toString(36).slice(2,6),emp,type,date,endDate:end,time:'',note,planned,eventClass:planned?'planli':'plansiz',status:planned?'Bekliyor':'Onaylandı',used:!planned,hours:type==='Mesai'?hours:undefined,createdAt:new Date().toISOString()}); save(); state.page='home'; render();
+ const planned=mode==='planli'; state.requests.push({id:Date.now().toString()+Math.random().toString(36).slice(2,6),emp,type,date,endDate:end,time,endTime,note,planned,eventClass:planned?'planli':'plansiz',status:planned?'Bekliyor':'Onaylandı',used:!planned,hours:type==='Mesai'?hours:undefined,createdAt:new Date().toISOString()}); save(); state.page='home'; render();
 }
-function renderLeaveHub(){ const pending=state.requests.filter(r=>isPlanned(r)&&r.status==='Bekliyor').length; const upcoming=state.requests.filter(r=>isPlanned(r)&&r.status==='Onaylandı'&&!r.used&&r.date>=todayStr()).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8); const unp=state.requests.filter(isUnplanned).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8); return `<h2>📅 İZİN PLANI</h2><div class="hero"><h2>Planlı & Plansız İzin Yönetimi</h2><div class="small">Planlanan izinleri önceden planlayın, son dakika gelişen durumları ayrı takip edin.</div></div><div class="quick-grid"><button onclick="state.page='leave_plan_all';render()">📅 PLANLI İZİNLER</button><button onclick="state.page='unplanned';render()">⚠️ PLANSIZ İZİNLER</button></div><div class="section-title">📌 Planlı İzinler</div><div class="dashboard-card"><b>${pending}</b> adet onay bekleyen planlı izin${upcoming.length?'<hr>'+upcoming.map(r=>{const e=reqEmployee(r);return `<div class="req-line"><b>${e?e.name:'?'}</b> · ${r.type}<br>${formatRangeTR(r)} <span class="pill pill-plan">Planlı</span></div>`}).join(''): '<p class="small">Yaklaşan plan yok.</p>'}</div><div class="section-title">⚠️ Plansız / Son Dakika</div><div class="dashboard-card">${unp.length?unp.map(r=>{const e=reqEmployee(r);return `<div class="req-line"><b>${e?e.name:'?'}</b> · ${r.type}<br>${formatDateTR(r.date)} <span class="pill pill-now">Plansız</span></div>`}).join(''):'<p class="small">Plansız kayıt yok.</p>'}</div><button onclick="state.page='unified_entry';render()">➕ TEK GİRİŞTEN KAYIT</button><button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`; }
+function openUnifiedEntry(){ state.ueMode='gunluk'; state.page='unified_entry'; render(); }
+function renderLeaveHub(){ const pending=state.requests.filter(r=>isPlanned(r)&&r.status==='Bekliyor').length; const upcoming=state.requests.filter(r=>isPlanned(r)&&r.status==='Onaylandı'&&!r.used&&r.date>=todayStr()).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8); const unp=state.requests.filter(isUnplanned).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8); return `<h2>📅 İZİN PLANI</h2><div class="hero"><h2>Planlı & Plansız İzin Yönetimi</h2><div class="small">Planlanan izinleri önceden planlayın, son dakika gelişen durumları ayrı takip edin.</div></div><div class="quick-grid"><button onclick="state.page='leave_plan_all';render()">📅 PLANLI İZİNLER</button><button onclick="state.page='unplanned';render()">⚠️ PLANSIZ İZİNLER</button></div><div class="section-title">📌 Planlı İzinler</div><div class="dashboard-card"><b>${pending}</b> adet onay bekleyen planlı izin${upcoming.length?'<hr>'+upcoming.map(r=>{const e=reqEmployee(r);return `<div class="req-line"><b>${e?e.name:'?'}</b> · ${r.type}<br>${formatRangeTR(r)} <span class="pill pill-plan">Planlı</span></div>`}).join(''): '<p class="small">Yaklaşan plan yok.</p>'}</div><div class="section-title">⚠️ Plansız / Son Dakika</div><div class="dashboard-card">${unp.length?unp.map(r=>{const e=reqEmployee(r);return `<div class="req-line"><b>${e?e.name:'?'}</b> · ${r.type}<br>${formatDateTR(r.date)} <span class="pill pill-now">Plansız</span></div>`}).join(''):'<p class="small">Plansız kayıt yok.</p>'}</div><button onclick="openUnifiedEntry()">➕ İZİN GİRİŞİ</button><button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`; }
 function renderUnifiedEntry(){
- const emps=activeEmployees(); return `<h2>➕ TEK GİRİŞ</h2><div class="hero"><h2>Mesai • İzin • Durum</h2><div class="small">Tüm kayıtları tek ekrandan girin. Planlı kayıtlar onaya düşer; plansız kayıtlar gerçekleşmiş durum olarak kaydedilir.</div></div><div class="dashboard-card"><select id="ueemp">${emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('')}</select><select id="uetype">${['Yıllık İzin','Ücretli İzin','Ücretsiz İzin','Sağlık/Rapor','Mazeret İzni','Diğer','Mesai','Mesai Yok','Akşam Erken Çıkış'].map(t=>`<option>${t}</option>`).join('')}</select><div class="row2"><input id="uedate" type="date" value="${todayStr()}"><input id="ueend" type="date" value="${todayStr()}"></div><label class="f">Mesai Saati (sadece "Mesai" için, varsayılan 12)</label><input id="uehours" type="number" step="0.5" min="0" value="12"><select id="uemode"><option value="planli">📅 Planlı — Onaya Gönder</option><option value="plansiz">⚠️ Plansız / Son Dakika — Gerçekleşti</option></select><input id="uenote" placeholder="Açıklama / not"><button onclick="addUnifiedEntry()">💾 KAYDI OLUŞTUR</button></div><div class="dashboard-card"><b>Hızlı işlemler</b><div class="quick-grid"><button onclick="state.page='leave_plan_all';render()">📅 İzin Planı</button><button onclick="state.page='daily_status';render()">🕐 Mesai Takibi</button><button onclick="state.page='unplanned';render()">⚠️ Plansız</button><button onclick="state.page='summary';render()">📊 Özetler</button></div></div><button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`;
+ const emps=activeEmployees();
+ const mode = state.ueMode || 'gunluk';
+ return `<h2>➕ İZİN GİRİŞİ</h2><div class="hero"><h2>Mesai • İzin • Durum</h2><div class="small">Tüm kayıtları tek ekrandan girin. Planlı kayıtlar onaya düşer; plansız kayıtlar gerçekleşmiş durum olarak kaydedilir.</div></div><div class="dashboard-card"><select id="ueemp">${emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('')}</select><select id="uetype">${['Yıllık İzin','Ücretli İzin','Ücretsiz İzin','Sağlık/Rapor','Mazeret İzni','Diğer','Mesai','Mesai Yok','Akşam Erken Çıkış'].map(t=>`<option>${t}</option>`).join('')}</select>
+ <label class="f">İzin Süresi</label>
+ <div class="row2">
+   <button class="${mode==='gunluk'?'btn-green':'btn-gray'}" onclick="state.ueMode='gunluk';render()">📅 Günlük İzin</button>
+   <button class="${mode==='saatlik'?'btn-green':'btn-gray'}" onclick="state.ueMode='saatlik';render()">🕐 Saatlik İzin</button>
+ </div>
+ ${mode==='saatlik' ? `
+   <label class="f">Tarih</label>
+   <input id="uedate" type="date" value="${todayStr()}">
+   <label class="f">Başlangıç Saati</label>
+   <input id="uestarttime" type="time" value="09:00">
+   <label class="f">Bitiş Saati</label>
+   <input id="ueendtime" type="time" value="12:00">
+ ` : `
+   <label class="f">Başlangıç Tarihi</label>
+   <input id="uedate" type="date" value="${todayStr()}">
+   <label class="f">Bitiş Tarihi</label>
+   <input id="ueend" type="date" value="${todayStr()}">
+ `}
+ <label class="f">Mesai Saati (sadece "Mesai" için, varsayılan 12)</label><input id="uehours" type="number" step="0.5" min="0" value="12"><select id="uemode"><option value="planli">📅 Planlı — Onaya Gönder</option><option value="plansiz">⚠️ Plansız / Son Dakika — Gerçekleşti</option></select><input id="uenote" placeholder="Açıklama / not"><button onclick="addUnifiedEntry()">💾 KAYDI OLUŞTUR</button></div><div class="dashboard-card"><b>Hızlı işlemler</b><div class="quick-grid"><button onclick="state.page='leave_plan_all';render()">📅 İzin Planı</button><button onclick="state.page='daily_status';render()">🕐 Mesai Takibi</button><button onclick="state.page='unplanned';render()">⚠️ Plansız</button><button onclick="state.page='summary';render()">📊 Özetler</button></div></div><button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`;
 }
 function renderSummaryHub(){
  const y=state.summaryYear,m=state.summaryMonth, tab=state.summaryTab||'monthly'; const rows=tab==='yearly'?yearSummaryData(y):summaryData(y,m); const total=k=>rows.reduce((a,x)=>a+x[k],0);
@@ -684,7 +725,7 @@ function renderPage() {
       </div>
     </div>
     <div class="stat-grid"><div class="stat" onclick="showPeopleSheetFromState('emps','Aktif Personel')"><span class="stat-ic ic-blue">👥</span><b>${emps.length}</b><span class="small">Aktif personel</span></div><div class="stat" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')"><span class="stat-ic ic-green">🟢</span><b>${workingToday}</b><span class="small">Bugün vardiyada</span></div><div class="stat" onclick="showPeopleSheetFromState('onLeave','Bugün İzinli')"><span class="stat-ic ic-orange">🏖️</span><b>${onLeaveToday}</b><span class="small">Bugün izinli</span></div><div class="stat" onclick="state.page='reqs_pending';render()"><span class="stat-ic ic-red">🔔</span><b>${pending}</b><span class="small">Bekleyen talep</span></div><div class="stat"><span class="stat-ic ic-orange">⚠️</span><b>${monthTotal('unplan')}</b><span class="small">Bu ay plansız</span></div><div class="stat"><span class="stat-ic ic-purple">💼</span><b>${monthTotal('mesaiSaat')}</b><span class="small">Bu ay mesai saat</span></div></div>
-    <div class="section-title">🚀 Hızlı İşlemler</div><div class="quick-grid"><button onclick="state.page='unified_entry';render()">➕ TEK GİRİŞ</button><button onclick="state.page='daily_status';render()">🕐 BUGÜN / VARDİYA</button><button onclick="state.page='leave_hub';render()">📅 İZİN PLANI</button><button onclick="state.page='summary';state.summaryTab='monthly';render()">📊 ÖZETLER</button></div>
+    <div class="section-title">🚀 Hızlı İşlemler</div><div class="quick-grid"><button onclick="openUnifiedEntry()">➕ İZİN GİRİŞİ</button><button onclick="state.page='daily_status';render()">🕐 BUGÜN / VARDİYA</button><button onclick="state.page='leave_hub';render()">📅 İZİN PLANI</button><button onclick="state.page='summary';state.summaryTab='monthly';render()">📊 ÖZETLER</button></div>
     <button onclick="state.page='annual_leave_summary';render()">🏖️ YILLIK İZİN ÖZETİ (${leaveRows.length})</button>
     <div class="section-title">📌 Bugün</div><div class="card" style="padding:10px 12px;cursor:pointer" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')">
       <div style="display:flex;flex-wrap:wrap;gap:6px">
