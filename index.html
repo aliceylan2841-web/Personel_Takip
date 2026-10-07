@@ -174,6 +174,22 @@ input,select,textarea{width:100%;padding:12px 13px!important;margin:6px 0!import
 .hm-act:active{transform:translateY(1px)}.hm-act:focus-visible,.hm-alert:focus-visible{outline:3px solid #7fb2ff;outline-offset:2px}
 .hm-alert{display:flex;justify-content:space-between;align-items:center;background:#fff7ea;border:1px solid #f6d8ad;color:#9a540a;border-radius:16px;padding:14px;font-size:13px;font-weight:800;margin-bottom:12px;cursor:pointer}
 @media(min-width:700px){.hm-actions{grid-template-columns:repeat(3,1fr)}}
+
+/* ===== KOMPAKT ===== */
+.dl-list{padding:4px 14px!important}
+.dl-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;font-weight:700;color:var(--navy);cursor:pointer}
+.dl-row:last-child{border-bottom:0}.dl-row:active{opacity:.6}
+.dl-pill{font-style:normal;font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+.dl-meta{font-style:normal;font-size:11px;font-weight:600;color:var(--muted)}
+.dl-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.dl-chip{font-size:13px;font-weight:800;padding:9px 14px;border-radius:999px;border:1.5px solid;cursor:pointer}
+.dl-chip.on{box-shadow:0 0 0 3px rgba(23,105,224,.25)}
+.stat-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important;margin:8px 0 12px!important}
+.stat{min-height:0!important;padding:9px 8px!important;border-radius:12px!important;gap:1px!important;align-items:flex-start;font-size:13px}
+.stat>b,.stat b{font-size:18px!important;line-height:1.1}.stat .small{font-size:10.5px!important}
+.hm-actions{grid-template-columns:repeat(3,1fr)!important;gap:7px!important}
+.hm-act{padding:9px 10px!important;border-radius:12px!important;font-size:12px!important;gap:1px!important}
+.hm-act small{font-size:10px!important}
 </style>
 </head>
 <body>
@@ -409,6 +425,18 @@ function showPeopleSheet(title, people) {
       <div class="type-sheet-actions"><button class="btn-gray" onclick="closePeopleSheet()">Kapat</button></div>
     </div>
   `;
+}
+function openDailySheet(empId, d) {
+  const e = state.employees.find(x => x.id === empId); if (!e) return;
+  const cur = getDailyStatus(empId, d), ST = state._dailyStyle || {};
+  let o = document.getElementById('peopleSheetOverlay');
+  if (!o) { o = document.createElement('div'); o.id = 'peopleSheetOverlay'; document.body.appendChild(o); }
+  o.className = 'type-sheet-overlay';
+  o.onclick = ev => { if (ev.target === o) closePeopleSheet(); };
+  o.innerHTML = `<div class="type-sheet"><div class="type-sheet-title">${e.name}</div><div class="small" style="margin-bottom:10px">${d.split('-').reverse().join('.')}</div><div class="dl-chips">${(state._dailyOpts || []).map(x => { const st = ST[x] || {}; return `<span class="dl-chip ${x === cur ? 'on' : ''}" style="background:${st.bg};color:${st.text};border-color:${st.border}" onclick="closePeopleSheet();setDailyStatus('${empId}','${d}','${x}')">${x}</span>`; }).join('')}</div><div class="type-sheet-actions"><button class="btn-gray" onclick="closePeopleSheet()">Kapat</button></div></div>`;
+}
+function renderCompactPeople(rows, y, m) {
+  return `<div class="card dl-list">${rows.map(x => `<div class="dl-row" onclick="showEmpMonthDetail('${x.emp.id}',${y},${m})"><span>${x.name}</span><i class="dl-meta">${x.plan} planlı · ${x.unplan} plansız</i></div>`).join('')}</div>`;
 }
 function closePeopleSheet() { const o = document.getElementById('peopleSheetOverlay'); if (o) o.remove(); }
 function openEmpEditById(empId) { const idx = state.employees.findIndex(e => e.id === empId); if (idx >= 0) openEmpEdit(idx); }
@@ -768,8 +796,8 @@ function renderSummaryHub(){
      <div class="stat-grid"><div class="stat">👥<b>${activeEmployees().length}</b><span class="small">Aktif personel</span></div><div class="stat">🔔<b>${state.requests.filter(r=>r.status==='Bekliyor').length}</b><span class="small">Bekleyen talep</span></div><div class="stat">📅<b>${total('plan')}</b><span class="small">Planlı gün</span></div><div class="stat">⚠️<b>${total('unplan')}</b><span class="small">Plansız gün</span></div><div class="stat">🏥<b>${total('report')}</b><span class="small">Rapor günü</span></div><div class="stat">💼<b>${total('mesai')}</b><span class="small">Mesai günü</span></div><div class="stat">🕐<b>${total('early')}</b><span class="small">Erken çıkış</span></div><div class="stat">➖<b>${total('noget')}</b><span class="small">Mesai yok</span></div></div>
      <div class="section-title">👥 Personel Özeti</div>
      ${wide ? `
-       <div class="small" style="margin:0 0 6px">Her personelin tüm ay/yıl detayları aşağıda — daha fazlası için karta dokunun.</div>
-       ${renderPersonnelWideCards(rows, y, m, tab)}
+       <div class="small" style="margin:0 0 6px">Her personelin tüm ay/yıl detayları aşağıda — detay için isme dokunun.</div>
+       ${renderCompactPeople(rows, y, m)}
      ` : `
        <div class="small" style="margin:0 0 6px">Detay için bir satıra dokunun, geniş görünüm için üstteki butonu kullanın.</div>
        <div class="card table-wrap"><table class="mini-table"><tr><th>Personel</th><th>Planlı</th><th>Plansız</th><th>Rapor</th><th>İzin</th><th>Mesai</th><th>Erken</th></tr>${rows.map(x=>`<tr onclick="showEmpMonthDetail('${x.emp.id}',${y},${m})" style="cursor:pointer"><td>${x.name}</td><td>${x.plan}</td><td>${x.unplan}</td><td>${x.report}</td><td>${x.leave}</td><td>${x.mesai}</td><td>${x.early}</td></tr>`).join('')}</table></div>
@@ -1019,16 +1047,10 @@ function renderPage() {
 
     let rows = emps.map(e => {
       const cur = getDailyStatus(e.id, d);
-      const style = STATUS_STYLE[cur] || STATUS_STYLE['Çalışıyor'];
-      return `
-        <div class="quick-row">
-          <span style="flex:1">${e.name}</span>
-          <select onchange="setDailyStatus('${e.id}','${d}',this.value)" style="background:${style.bg};border-color:${style.border};color:${style.text};font-weight:600">
-            ${opts.map(o => `<option ${o === cur ? 'selected' : ''}>${o}</option>`).join('')}
-          </select>
-        </div>
-      `;
+      const st = STATUS_STYLE[cur] || STATUS_STYLE['Çalışıyor'];
+      return `<div class="dl-row" onclick="openDailySheet('${e.id}','${d}')"><span>${e.name}</span><i class="dl-pill" style="background:${st.bg};color:${st.text};border-color:${st.border}">${cur}</i></div>`;
     }).join('');
+    state._dailyStyle = STATUS_STYLE; state._dailyOpts = opts;
 
     const STATUS_ICONS = { 'Çalışıyor': '🟢', 'İzinli': '🏖️', 'Erken Çıkış': '🕐', 'Mesai': '💼', 'Mesai Yok': '➖', 'Raporlu': '🏥', 'Mazeret': '📄', 'Ücretli İzin': '🏖️', 'Ücretsiz İzin': '⏸️', 'Doğum İzni': '👶', 'Evlilik İzni': '💍', 'Ölüm İzni': '🕊️', 'Diğer': '•' };
     const summaryLine = opts.filter(o => counts[o] > 0).map(o => `${STATUS_ICONS[o]} ${o}: <b>${counts[o]}</b>`).join(' &nbsp; ');
@@ -1040,8 +1062,8 @@ function renderPage() {
         👥 Toplam: <b>${emps.length}</b><br>
         ${summaryLine}
       </div>
-      <div class="card">${rows || '<p>Aktif çalışan yok.</p>'}</div>
-      <div class="info-box">ℹ️ Bu ekran o günün durumunu tek tıkla kaydeder. Çok günlük planlanmış izinler İzin Planı'ndan yönetilir.</div>
+      <div class="card dl-list">${rows || '<p>Aktif çalışan yok.</p>'}</div>
+      <div class="info-box">ℹ️ Bir isme dokunup durumu seçin. Çok günlük planlanmış izinler İzin Planı'ndan yönetilir.</div>
       <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>
     `;
 
