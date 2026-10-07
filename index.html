@@ -850,9 +850,9 @@ function renderPage() {
       </div>
       <div class="hm-panel"><h3>Önümüzdeki 7 gün, izinli kişi sayısı</h3><div class="hm-week">${week}</div></div>
       ${b.onLeave.length?`<div class="hm-panel"><h3>Bugün izinde olanlar</h3>${leaveList}</div>`:''}
-      <div class="hm-panel"><h3>Bu ay</h3>
-        <div class="hm-row">Plansız durum<span>${mt('unplan')}</span></div>
-        <div class="hm-row">Toplam mesai<span>${mt('mesaiSaat')} saat</span></div>
+      <div class="hm-panel"><h3>Bu ay kullanılan</h3>
+        <div class="hm-row">İzin günü<span>${mt('leave')} gün</span></div>
+        <div class="hm-row">Rapor günü<span>${mt('report')} gün</span></div>
       </div></div>`;
   } else if (state.page === 'emp_list') {
     const today = todayStr();
