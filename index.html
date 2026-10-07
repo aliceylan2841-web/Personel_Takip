@@ -142,6 +142,38 @@ input,select,textarea{width:100%;padding:12px 13px!important;margin:6px 0!import
 @media(max-width:390px){#app{padding-left:11px;padding-right:11px}.stat-grid{gap:7px}.stat{padding:11px!important;min-height:90px!important}.stat>b{font-size:22px}.quick-grid{gap:7px!important}.hero{padding:19px 16px}.hero h2{font-size:20px}}
 @media(min-width:700px){.stat-grid{grid-template-columns:repeat(3,1fr)}.quick-grid{grid-template-columns:repeat(4,1fr)!important}}
 
+
+/* ===== SIMPLE PROFESSIONAL DASHBOARD ===== */
+.today-summary{padding:14px!important}.today-main{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.today-main>div{background:#f5f8fc;border-radius:13px;padding:11px 8px;text-align:center}.today-main b{display:block;font-size:22px;color:var(--navy);line-height:1.1}.today-main span{display:block;font-size:10px;color:var(--muted);margin-top:4px;font-weight:700}.dashboard-alerts{padding:7px 14px!important}.alert-line{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line);font-size:12px;font-weight:700}.alert-line:last-child{border-bottom:0}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px}.dot.red{background:var(--red)}.dot.orange{background:var(--orange)}.dot.blue{background:var(--blue)}.qic{font-size:16px;font-weight:900;margin-right:3px}.bottom-nav{position:fixed;z-index:900;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,760px);padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:rgba(255,255,255,.94);backdrop-filter:blur(16px);border-top:1px solid rgba(220,228,239,.95);display:grid;grid-template-columns:repeat(5,1fr);gap:4px;box-shadow:0 -8px 25px rgba(20,43,76,.08)}.bottom-nav button{margin:0!important;padding:7px 3px!important;background:transparent!important;color:#718096!important;box-shadow:none!important;border-radius:12px!important;font-size:9px!important;font-weight:800!important;letter-spacing:0}.bottom-nav button .nav-ic{display:block;font-size:17px;line-height:18px;margin-bottom:2px}.bottom-nav button.active{background:#eaf2ff!important;color:var(--blue)!important}.more-sheet{position:fixed;z-index:1001;inset:0;background:rgba(7,26,51,.42);display:flex;align-items:flex-end}.more-panel{width:min(100%,760px);margin:0 auto;background:#fff;border-radius:22px 22px 0 0;padding:18px 15px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -15px 50px rgba(0,0,0,.2)}.more-panel h3{margin:0 0 12px;color:var(--navy)}.more-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.more-grid button{margin:0;background:#f4f7fb;color:#26374d;box-shadow:none}.more-close{margin-top:9px!important;background:#edf1f6!important;color:#52647b!important}body.has-bottom-nav{padding-bottom:82px!important}
+
+
+/* ===== ANA SAYFA v3 ===== */
+.hm{color:#fff}
+.hm-top{display:flex;justify-content:space-between;align-items:baseline;margin:2px 4px 18px;font-size:12px;font-weight:700;color:rgba(255,255,255,.62)}
+.hm-top b{color:#fff;font-size:13px;letter-spacing:.01em}
+.hm-head{margin:0 4px 6px;font-size:34px;line-height:1.08;font-weight:850;letter-spacing:-.035em;color:#fff}
+.hm-head em{font-style:normal;color:#7fb2ff}
+.hm-sub{margin:0 4px 18px;font-size:13px;color:rgba(255,255,255,.7);line-height:1.5}
+.hm-roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(26px,1fr));gap:6px;margin:0 4px 22px}
+.hm-tile{aspect-ratio:1;border-radius:8px;background:#4b8ff7;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
+.hm-tile.off{background:#ef8b2c}
+.hm-legend{display:flex;gap:14px;margin:-14px 4px 20px;font-size:11px;color:rgba(255,255,255,.65);font-weight:600}
+.hm-legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;background:#4b8ff7}.hm-legend i.o{background:#ef8b2c}
+.hm-panel{background:#fff;border-radius:22px;padding:16px;margin-bottom:12px;color:var(--text);box-shadow:var(--shadow)}
+.hm-panel h3{margin:0 0 10px;font-size:14px;font-weight:850;color:var(--navy)}
+.hm-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px;font-weight:700}
+.hm-row:last-child{border-bottom:0;padding-bottom:0}.hm-row span{color:var(--muted);font-weight:600;font-size:12px}
+.hm-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end;height:92px}
+.hm-day{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;height:100%;font-size:10px;font-weight:700;color:var(--muted)}
+.hm-bar{width:100%;border-radius:7px 7px 3px 3px;background:#e5efff;min-height:4px}
+.hm-day.today{color:var(--navy)}.hm-day.today .hm-bar{background:#1769e0}.hm-day b{font-size:11px;color:var(--navy)}
+.hm-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-bottom:12px}
+.hm-act{background:#fff;border-radius:16px;padding:14px;color:var(--navy);font-weight:850;font-size:13px;box-shadow:0 7px 20px rgba(25,51,87,.07);cursor:pointer;display:flex;flex-direction:column;gap:3px}
+.hm-act small{font-weight:600;color:var(--muted);font-size:11px}
+.hm-act.hot{background:#fff7ea;color:#9a540a}.hm-act.hot small{color:#b8731f}
+.hm-act:active{transform:translateY(1px)}.hm-act:focus-visible,.hm-alert:focus-visible{outline:3px solid #7fb2ff;outline-offset:2px}
+.hm-alert{display:flex;justify-content:space-between;align-items:center;background:#fff7ea;border:1px solid #f6d8ad;color:#9a540a;border-radius:16px;padding:14px;font-size:13px;font-weight:800;margin-bottom:12px;cursor:pointer}
+@media(min-width:700px){.hm-actions{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
 <body>
@@ -755,38 +787,43 @@ function renderPage() {
   if (state.page === 'unplanned') { root.innerHTML=renderUnplanned(); return; }
 
   if (state.page === 'home') {
-    const today=todayStr(), emps=activeEmployees(), pending=state.requests.filter(r=>r.status==='Bekliyor').length;
-    const buckets=todayBuckets(today);
-    const onLeaveToday=buckets.onLeave.length, workingToday=buckets.working.length;
-    const earlyToday=state.requests.filter(r=>r.type==='Akşam Erken Çıkış'&&r.status==='Onaylandı'&&rangeIncludes(r,today)).length;
-    const month=new Date().getMonth(), year=new Date().getFullYear();
-    const monthRows=summaryData(year,month), monthTotal=k=>monthRows.reduce((a,x)=>a+x[k],0);
-    const planned=state.requests.filter(r=>isPlanned(r)&&r.status==='Bekliyor').length;
-    const leaveRows=emps.map(e=>{const inf=leaveInfo(e);return {e,inf}});
-    state._todayBuckets = buckets;
-    const todayLong = new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'});
-    const attendanceRate = emps.length ? Math.round((workingToday/emps.length)*100) : 0;
-    root.innerHTML=`<div class="hero">
-      <div class="hero-top"><h2 style="margin:0">PERSONEL TAKİP</h2><span class="hero-date">${todayLong}</span></div>
-      <div class="small">Bugünün durumu, izin bakiyeleri ve hızlı işlemler</div>
-      <div class="hero-metrics">
-        <div class="hero-metric"><b>%${attendanceRate}</b><span>Bugün katılım</span></div>
-        <div class="hero-metric"><b>${onLeaveToday}</b><span>İzinli</span></div>
-        <div class="hero-metric"><b>${pending}</b><span>Bekleyen talep</span></div>
+    const today=todayStr(), emps=activeEmployees(), b=todayBuckets(today);
+    const pending=state.requests.filter(r=>r.status==='Bekliyor').length;
+    const now=new Date(), month=now.getMonth(), year=now.getFullYear();
+    const monthRows=summaryData(year,month), mt=k=>monthRows.reduce((a,x)=>a+x[k],0);
+    const hr=now.getHours(), greet=hr<12?'Günaydın':hr<18?'İyi günler':'İyi akşamlar';
+    const dateLong=now.toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'});
+    const offIds=new Set(b.onLeave.map(p=>p.empId));
+    const ini=n=>(n||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+    const tiles=emps.map(e=>`<div class="hm-tile ${offIds.has(e.id)?'off':''}" title="${e.name}">${ini(e.name)}</div>`).join('');
+    const fmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const days=[...Array(7)].map((_,i)=>{const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+i),s=fmt(d);
+      const n=new Set(state.requests.filter(r=>isLeaveType(r.type)&&r.status!=='Reddedildi'&&rangeIncludes(r,s)).map(r=>r.emp)).size;
+      return {n,label:d.toLocaleDateString('tr-TR',{weekday:'short'}).slice(0,3),today:i===0};});
+    const mx=Math.max(1,...days.map(d=>d.n));
+    const week=days.map(d=>`<div class="hm-day ${d.today?'today':''}"><b>${d.n}</b><div class="hm-bar" style="height:${Math.round(d.n/mx*56)+4}px"></div>${d.label}</div>`).join('');
+    const leaveList=b.onLeave.slice(0,5).map(p=>`<div class="hm-row">${p.name}<span>${p.sub}</span></div>`).join('')
+      +(b.onLeave.length>5?`<div class="hm-row"><span>+${b.onLeave.length-5} kişi daha</span></div>`:'');
+    root.innerHTML=`<div class="hm">
+      <div class="hm-top"><b>${greet}</b><span>${dateLong}</span></div>
+      <h1 class="hm-head">Bugün <em>${b.working.length}</em> kişi<br>vardiyada</h1>
+      <p class="hm-sub">${b.onLeave.length?b.onLeave.length+' kişi izinde':'Kimse izinde değil'}, ${emps.length} aktif personel.</p>
+      <div class="hm-roster">${tiles}</div>
+      <div class="hm-legend"><span><i></i>Çalışıyor</span><span><i class="o"></i>İzinde</span></div>
+      <div class="hm-actions">
+        <div class="hm-act" role="button" tabindex="0" onclick="state.page='emp_list';render()">Personeller<small>${emps.length} kişi</small></div>
+        <div class="hm-act ${pending?'hot':''}" role="button" tabindex="0" onclick="state.page='reqs_pending';render()">Bekleyen Talepler<small>${pending?pending+' onay bekliyor':'Bekleyen yok'}</small></div>
+        <div class="hm-act" role="button" tabindex="0" onclick="state.page='daily_status';render()">Bugün / Vardiya<small>Günlük durum</small></div>
+        <div class="hm-act" role="button" tabindex="0" onclick="state.page='leave_hub';render()">Yıllık İzin Planı<small>Plan ve onay</small></div>
+        <div class="hm-act" role="button" tabindex="0" onclick="state.page='annual_leave_summary';render()">İzin Özeti<small>Kalan haklar</small></div>
+        <div class="hm-act" role="button" tabindex="0" onclick="state.page='reqs_all';render()">Tüm Kayıtlar<small>Geçmiş liste</small></div>
       </div>
-    </div>
-    <div class="stat-grid"><div class="stat" onclick="showPeopleSheetFromState('emps','Aktif Personel')"><span class="stat-ic ic-blue">👥</span><b>${emps.length}</b><span class="small">Aktif personel</span></div><div class="stat" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')"><span class="stat-ic ic-green">🟢</span><b>${workingToday}</b><span class="small">Bugün vardiyada</span></div><div class="stat" onclick="showPeopleSheetFromState('onLeave','Bugün İzinli')"><span class="stat-ic ic-orange">🏖️</span><b>${onLeaveToday}</b><span class="small">Bugün izinli</span></div><div class="stat" onclick="state.page='reqs_pending';render()"><span class="stat-ic ic-red">🔔</span><b>${pending}</b><span class="small">Bekleyen talep</span></div><div class="stat"><span class="stat-ic ic-orange">⚠️</span><b>${monthTotal('unplan')}</b><span class="small">Bu ay plansız</span></div><div class="stat"><span class="stat-ic ic-purple">💼</span><b>${monthTotal('mesaiSaat')}</b><span class="small">Bu ay mesai saat</span></div></div>
-    <div class="section-title">🚀 Hızlı İşlemler</div><div class="quick-grid"><button onclick="openUnifiedEntry()">➕ İZİN GİRİŞİ</button><button onclick="state.page='daily_status';render()">🕐 BUGÜN / VARDİYA</button><button onclick="state.page='leave_hub';render()">🏖️ YILLIK İZİN PLANI GİRİŞ</button><button onclick="state.page='summary';state.summaryTab='monthly';render()">📊 ÖZETLER</button></div>
-    <button onclick="state.page='annual_leave_summary';render()">🏖️ YILLIK İZİN ÖZETİ (${leaveRows.length})</button>
-    <div class="section-title">📌 Bugün</div><div class="card" style="padding:10px 12px;cursor:pointer" onclick="showPeopleSheetFromState('working','Bugün Vardiyada')">
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-        <span class="pill" style="background:#e8f5e9;color:#2e7d32">🟢 Vardiyada ${workingToday}${Object.keys(buckets.shiftCounts).length?` <span style="opacity:.75;font-weight:normal">(${Object.entries(buckets.shiftCounts).map(([s,c])=>`${s}: ${c}`).join(', ')})</span>`:''}</span>
-        <span class="pill" style="background:#fff3e0;color:#e65100">🏖️ İzinli ${onLeaveToday}${Object.keys(buckets.leaveCounts).length?` <span style="opacity:.75;font-weight:normal">(${Object.entries(buckets.leaveCounts).map(([t,c])=>`${t}: ${c}`).join(', ')})</span>`:''}</span>
-        ${earlyToday?`<span class="pill">🕐 Erken Çıkış ${earlyToday}</span>`:''}
-      </div>
-      ${planned?`<div class="small" style="margin-top:6px">${planned} planlı talep onay bekliyor.</div>`:''}
-    </div>
-    <div class="section-title">📂 Yönetim</div><div class="quick-grid"><button onclick="state.page='emp_list';render()">👥 Personeller</button><button onclick="state.page='reqs_pending';render()">🔔 Bekleyen Talepler (${pending})</button><button onclick="state.page='calendar';render()">🗓️ Takvim</button><button onclick="state.page='settings';render()">⚙️ Ayarlar</button></div>`;
+      <div class="hm-panel"><h3>Önümüzdeki 7 gün, izinli kişi sayısı</h3><div class="hm-week">${week}</div></div>
+      ${b.onLeave.length?`<div class="hm-panel"><h3>Bugün izinde olanlar</h3>${leaveList}</div>`:''}
+      <div class="hm-panel"><h3>Bu ay</h3>
+        <div class="hm-row">Plansız durum<span>${mt('unplan')}</span></div>
+        <div class="hm-row">Toplam mesai<span>${mt('mesaiSaat')} saat</span></div>
+      </div></div>`;
   } else if (state.page === 'emp_list') {
     const today = todayStr();
     const depts = [...new Set(state.employees.map(e => e.dept).filter(Boolean))];
@@ -1194,7 +1231,43 @@ function syncHistory() {
 }
 function render() {
   renderPage();
+  document.body.classList.add('has-bottom-nav');
+  renderBottomNav();
   syncHistory();
+}
+
+function goNav(page){
+  if(page==='more'){showMoreMenu();return;}
+  state.page=page;
+  if(page==='summary') state.summaryTab='monthly';
+  render();
+}
+function renderBottomNav(){
+  const app=document.getElementById('app');
+  document.querySelectorAll('.bottom-nav').forEach(n=>n.remove());
+  const p=state.page;
+  const active=x=>p===x?'active':'';
+  app.insertAdjacentHTML('beforeend',`<nav class="bottom-nav">
+    <button class="${active('home')}" onclick="goNav('home')"><span class="nav-ic">⌂</span>Ana Sayfa</button>
+    <button class="${active('unified_entry')}" onclick="goNav('unified_entry')"><span class="nav-ic">＋</span>Kayıt</button>
+    <button class="${active('calendar')}" onclick="goNav('calendar')"><span class="nav-ic">□</span>Takvim</button>
+    <button class="${active('summary')}" onclick="goNav('summary')"><span class="nav-ic">▥</span>Özet</button>
+    <button class="${active('settings')}" onclick="goNav('settings')"><span class="nav-ic">⚙</span>Ayarlar</button>
+  </nav>`);
+}
+function showMoreMenu(){
+  document.querySelectorAll('.more-sheet').forEach(x=>x.remove());
+  document.body.insertAdjacentHTML('beforeend',`<div class="more-sheet" onclick="if(event.target===this)this.remove()"><div class="more-panel">
+    <h3>Daha Fazla</h3>
+    <div class="more-grid">
+      <button onclick="this.closest('.more-sheet').remove();state.page='leave_hub';render()">🏖️ Yıllık İzin Planı</button>
+      <button onclick="this.closest('.more-sheet').remove();state.page='reqs_pending';render()">🔔 Bekleyen Talepler</button>
+      <button onclick="this.closest('.more-sheet').remove();state.page='reqs_all';render()">📋 Tüm Kayıtlar</button>
+      <button onclick="this.closest('.more-sheet').remove();state.page='daily_status';render()">🕐 Bugün / Vardiya</button>
+      <button onclick="this.closest('.more-sheet').remove();state.page='annual_leave_summary';render()">🏖️ İzin Özeti</button>
+      <button onclick="this.closest('.more-sheet').remove();state.page='settings';render()">⚙️ Ayarlar</button>
+    </div><button class="more-close" onclick="this.closest('.more-sheet').remove()">Kapat</button>
+  </div></div>`);
 }
 window.addEventListener('popstate', (e) => {
   _navSyncing = true;
