@@ -195,6 +195,9 @@ input,select,textarea{width:100%;padding:12px 13px!important;margin:6px 0!import
 <body>
 <div id="app"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 let state = {
   page: 'home',
@@ -231,9 +234,10 @@ let state = {
 function save() {
   localStorage.setItem('mt_employees', JSON.stringify(state.employees));
   localStorage.setItem('mt_requests', JSON.stringify(state.requests));
+  if (window.cloudPush) cloudPush();
 }
 function getMinStaff() { return parseInt(localStorage.getItem('mt_minStaff') || '0'); }
-function setMinStaff(v) { localStorage.setItem('mt_minStaff', v || '0'); render(); }
+function setMinStaff(v) { localStorage.setItem('mt_minStaff', v || '0'); if (window.cloudPush) cloudPush(); render(); }
 
 const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 const AYLAR_KISA = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
@@ -1222,6 +1226,8 @@ function renderPage() {
       <div class="card">
         <b>Yedekleme</b><br><br>
         <button class="btn-green" onclick="exportBackup()">📤 Verileri Yedekle (.json)</button>
+        <button class="btn-green" style="margin-top:8px" onclick="exportExcel()">📊 Excel'e Aktar (.xlsx)</button>
+        ${cloud.ref && firebase.auth().currentUser ? `<button class="btn-gray" style="margin-top:8px" onclick="cloudLogout()">🔒 Çıkış Yap (${firebase.auth().currentUser.email})</button><div class="small" style="margin-top:6px">☁️ Veriler bulutla eşitleniyor.</div>` : ''}
         <label class="f">Yedek Dosyasını Yükle</label>
         <input type="file" accept="application/json" onchange="importBackupFile(this)">
       </div>
@@ -1598,6 +1604,37 @@ function exportReportExcel(year, month) {
 }
 
 // --- Yedekleme ---
+function exportExcel() {
+  const nm = id => (state.employees.find(e => e.id === id) || {}).name || '';
+  const fd = d => d ? d.split('-').reverse().join('.') : '';
+  const empKeys = [...new Set(state.employees.flatMap(e => Object.keys(e)))].filter(k => k !== 'id');
+  const personel = [empKeys, ...state.employees.map(e => empKeys.map(k => (typeof e[k] === 'object' ? JSON.stringify(e[k]) : (e[k] ?? ''))))];
+  const kayit = [['Personel', 'Tür', 'Başlangıç', 'Bitiş', 'Saat', 'Durum', 'Not']].concat(
+    state.requests.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(r => [nm(r.emp), r.type, fd(r.date), fd(r.endDate || r.date), r.time || '', r.status || '', r.note || '']));
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  const ozet = [['Personel', 'Planlı gün', 'Plansız gün', 'İzin günü', 'Rapor günü', 'Erken çıkış', 'Mesai günü', 'Mesai saat']].concat(
+    summaryData(y, m).map(x => [x.name, x.plan, x.unplan, x.leave, x.report, x.early, x.mesai, x.mesaiSaat]));
+  const name = 'personel-takip-' + y + '-' + String(m + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  const go = () => {
+    const wb = XLSX.utils.book_new();
+    [['Personel', personel], ['Kayıtlar', kayit], ['Aylık Özet', ozet]].forEach(([n, a]) => {
+      const ws = XLSX.utils.aoa_to_sheet(a);
+      ws['!cols'] = (a[0] || []).map((_, i) => ({ wch: Math.min(32, Math.max(10, ...a.map(r => String(r[i] ?? '').length)) + 2) }));
+      XLSX.utils.book_append_sheet(wb, ws, n);
+    });
+    XLSX.writeFile(wb, name + '.xlsx');
+  };
+  if (window.XLSX) return go();
+  const sc = document.createElement('script');
+  sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  sc.onload = go;
+  sc.onerror = () => {
+    const csv = '\uFEFF' + kayit.map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(';')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = name + '.csv'; a.click();
+    alert('İnternet yok, Excel kütüphanesi yüklenemedi. Kayıtlar CSV olarak indirildi (Excel açar).');
+  };
+  document.head.appendChild(sc);
+}
 function exportBackup() {
   const data = JSON.stringify({ employees: state.employees, requests: state.requests, exportedAt: new Date().toISOString() }, null, 2);
   const blob = new Blob([data], { type: 'application/json' });
@@ -1632,7 +1669,104 @@ function wipeAllData() {
   state.employees = []; state.requests = []; save(); render();
 }
 
+
+/* ===== BULUT EŞİTLEME (Firebase) ===== */
+const FB_CONFIG = {
+  apiKey: "AIzaSyBTmIaD3Bj68SL2gwvQwSUPBhNju5GUcic",
+  authDomain: "personel-takip-8d2cd.firebaseapp.com",
+  projectId: "personel-takip-8d2cd",
+  storageBucket: "personel-takip-8d2cd.firebasestorage.app",
+  messagingSenderId: "690185390042",
+  appId: "1:690185390042:web:d59625e26a76218ebd22e3"
+};
+const cloud = { ref: null, unsub: null, ready: false };
+function cloudInit() {
+  if (!window.firebase) return; // internet yoksa yerel çalışır
+  firebase.initializeApp(FB_CONFIG);
+  const db = firebase.firestore();
+  try { db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (e) {}
+  cloud.ref = db.collection('data').doc('main');
+  firebase.auth().onAuthStateChanged(u => {
+    if (u) { hideLogin(); cloudStart(); }
+    else { if (cloud.unsub) { cloud.unsub(); cloud.unsub = null; } cloud.ready = false; showLogin(); }
+  });
+}
+function showLogin(msg) {
+  let o = document.getElementById('loginBox');
+  if (!o) { o = document.createElement('div'); o.id = 'loginBox'; document.body.appendChild(o); }
+  o.style.cssText = 'position:fixed;inset:0;z-index:99999;background:linear-gradient(160deg,#011431,#0b3a7a);display:flex;align-items:center;justify-content:center;padding:20px;font-family:inherit';
+  o.innerHTML = `<div style="background:#fff;border-radius:22px;padding:24px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+    <div style="font-size:22px;font-weight:850;color:#011431;margin-bottom:4px">Mesai Takip</div>
+    <div style="font-size:13px;color:#6b7a90;margin-bottom:16px">Devam etmek için giriş yapın</div>
+    <input id="lgMail" type="email" autocomplete="username" placeholder="E-posta" style="width:100%;box-sizing:border-box;padding:13px;border:1px solid #d5deea;border-radius:12px;font-size:15px;margin-bottom:10px">
+    <input id="lgPass" type="password" autocomplete="current-password" placeholder="Şifre" style="width:100%;box-sizing:border-box;padding:13px;border:1px solid #d5deea;border-radius:12px;font-size:15px;margin-bottom:10px" onkeydown="if(event.key==='Enter')cloudLogin()">
+    <div id="lgMsg" style="min-height:18px;font-size:12px;color:#c62828;margin-bottom:8px">${msg || ''}</div>
+    <div onclick="cloudLogin()" style="background:#1769e0;color:#fff;text-align:center;padding:13px;border-radius:12px;font-weight:800;cursor:pointer">Giriş Yap</div></div>`;
+}
+function hideLogin() { const o = document.getElementById('loginBox'); if (o) o.remove(); }
+function cloudLogin() {
+  const m = document.getElementById('lgMail').value.trim(), pw = document.getElementById('lgPass').value;
+  const say = t => { const x = document.getElementById('lgMsg'); if (x) x.textContent = t; };
+  if (!m || !pw) return say('E-posta ve şifre girin.');
+  say('Giriş yapılıyor...');
+  firebase.auth().signInWithEmailAndPassword(m, pw).catch(e => say(
+    ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'].includes(e.code) ? 'E-posta veya şifre hatalı.'
+    : e.code === 'auth/too-many-requests' ? 'Çok fazla deneme. Biraz bekleyin.' : 'Giriş yapılamadı: ' + (e.code || e.message)));
+}
+function cloudLogout() { if (confirm('Çıkış yapılsın mı?')) firebase.auth().signOut(); }
+function cloudStart() {
+  if (cloud.unsub) return;
+  cloud.unsub = cloud.ref.onSnapshot(snap => {
+    if (snap.metadata.hasPendingWrites) return;
+    const localHas = state.employees.length || state.requests.length;
+    if (!snap.exists) {
+      cloud.ready = true;
+      if (localHas) cloudPush();
+      localStorage.setItem('mt_synced', '1');
+      return;
+    }
+    const d = snap.data();
+    if (!cloud.ready) {
+      const same = JSON.stringify(d.employees || []) === JSON.stringify(state.employees) && JSON.stringify(d.requests || []) === JSON.stringify(state.requests);
+      if (localStorage.getItem('mt_synced') !== '1' && localHas && !same) {
+        const useCloud = confirm('Bulutta kayıtlı veri var.\n\nTAMAM: Bulut verisi kullanılsın (bu cihazdaki veri değişir)\nİPTAL: Bu cihazdaki veri buluta yüklensin (buluttaki veri silinir)');
+        if (!useCloud) { cloud.ready = true; localStorage.setItem('mt_synced', '1'); cloudPush(); return; }
+      }
+      localStorage.setItem('mt_synced', '1');
+    }
+    cloud.ready = true;
+    cloudApply(d);
+  }, err => console.warn('Bulut hatası', err));
+}
+function cloudApply(d) {
+  const e = d.employees || [], r = d.requests || [];
+  const ms = d.minStaff != null ? String(d.minStaff) : null;
+  const changed = JSON.stringify(e) !== JSON.stringify(state.employees) || JSON.stringify(r) !== JSON.stringify(state.requests) || (ms !== null && ms !== String(getMinStaff()));
+  if (!changed) return;
+  state.employees = e; state.requests = r;
+  localStorage.setItem('mt_employees', JSON.stringify(e));
+  localStorage.setItem('mt_requests', JSON.stringify(r));
+  if (ms !== null) localStorage.setItem('mt_minStaff', ms);
+  const tryRender = () => {
+    const a = document.activeElement;
+    if ((a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) || document.querySelector('.type-sheet-overlay')) return setTimeout(tryRender, 2500);
+    render();
+  };
+  tryRender();
+}
+function cloudPush() {
+  if (!cloud.ref || !cloud.ready) return;
+  const clean = o => JSON.parse(JSON.stringify(o));
+  cloud.ref.set({
+    employees: clean(state.employees), requests: clean(state.requests), minStaff: getMinStaff(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: (firebase.auth().currentUser || {}).email || ''
+  }).catch(err => console.warn('Buluta yazılamadı', err));
+}
+window.cloudPush = cloudPush;
+
 render();
+cloudInit();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
