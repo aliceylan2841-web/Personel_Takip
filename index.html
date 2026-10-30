@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Mesai Takip</title>
 <meta name="description" content="Personel mesai, izin ve talep takip uygulaması">
-<meta name="application-version" content="2.0 Premium UI">
+<meta name="application-version" content="3.0 Kurumsal UI">
 <meta name="theme-color" content="#011431">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="32x32" href="Icons/favicon-32.png">
@@ -190,6 +190,33 @@ input,select,textarea{width:100%;padding:12px 13px!important;margin:6px 0!import
 .hm-actions{grid-template-columns:repeat(3,1fr)!important;gap:7px!important}
 .hm-act{padding:9px 10px!important;border-radius:12px!important;font-size:12px!important;gap:1px!important}
 .hm-act small{font-size:10px!important}
+
+/* ===== Profesyonel Kurumsal Tema ===== */
+:root{--pri:#0b3a75;--pri2:#1456a8;--ink:#1b2a3d;--mut:#6b7a90;--line:#e3e9f1;--bg:#f2f5fa;--card:#fff;--ok:#1b7f4b;--bad:#c0392b;--hol:#fdecea}
+html{-webkit-text-size-adjust:100%}
+body{font-family:Inter,"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif!important;background:var(--bg)!important;color:var(--ink)!important;max-width:980px;margin:0 auto!important;padding:18px 16px 96px!important;line-height:1.45;letter-spacing:.005em}
+h2{font-size:13px!important;font-weight:800!important;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)!important;margin:6px 0 14px!important;padding-bottom:10px;border-bottom:2px solid var(--line);position:relative}
+h2::after{content:"";position:absolute;left:0;bottom:-2px;width:46px;height:2px;background:var(--pri2)}
+.card{background:var(--card)!important;border:1px solid var(--line)!important;border-radius:14px!important;padding:16px!important;box-shadow:0 1px 2px rgba(16,42,77,.04),0 8px 24px rgba(16,42,77,.05)!important;margin-bottom:14px!important}
+button{background:linear-gradient(180deg,var(--pri2),var(--pri))!important;border-radius:10px!important;font-weight:650!important;letter-spacing:.01em;box-shadow:0 1px 2px rgba(11,58,117,.25);transition:transform .08s,box-shadow .15s,filter .15s}
+button:hover{filter:brightness(1.07);box-shadow:0 4px 12px rgba(11,58,117,.25)}button:active{transform:translateY(1px)}
+button.btn-green{background:linear-gradient(180deg,#22995e,var(--ok))!important}button.btn-red{background:linear-gradient(180deg,#d4483a,var(--bad))!important}button.btn-gray{background:linear-gradient(180deg,#7a8798,#5f6b7c)!important}button.btn-orange{background:linear-gradient(180deg,#f08a24,#d9720f)!important}
+input,select,textarea{border:1px solid #d3dbe7!important;border-radius:10px!important;background:#fbfcfe!important;font-size:14px;padding:11px 12px!important;color:var(--ink);transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri2)!important;box-shadow:0 0 0 3px rgba(20,86,168,.15)!important;background:#fff!important}
+label.f{font-size:11px!important;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)!important;margin-top:10px!important}
+.badge{border-radius:999px!important;padding:3px 10px!important;font-size:11px!important;letter-spacing:.03em}
+.info-box,.warn-box,.danger-box{border-radius:10px!important;border-width:1px 1px 1px 4px!important;font-size:12.5px!important}
+.cal-day.holiday{background:var(--hol)!important;border-color:#f3c4be!important}
+.cal-day.holiday .cal-daynum{color:var(--bad)}
+.cal-hol{font-size:8.5px;line-height:1.15;color:#a93226;font-weight:700;margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.cal-day.today{border:2px solid var(--pri2)!important}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+th{background:#eef3fa;color:var(--pri);font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.05em;padding:9px 8px;border-bottom:1px solid var(--line)}
+td{padding:9px 8px;border-bottom:1px solid #eef2f7}tr:hover td{background:#fafcff}
+.req-line,.quick-row{border-bottom:1px solid #eef2f7!important}
+.type-sheet{border-radius:20px 20px 0 0!important}.type-card{border-radius:14px!important}
+@media(min-width:760px){body{padding-top:28px!important}}
+@media print{button,nav,#bottomNav{display:none!important}body{background:#fff!important}.card{box-shadow:none!important}}
 </style>
 </head>
 <body>
@@ -230,6 +257,29 @@ let state = {
   const allowed = ['new_req', 'calendar', 'emp_list', 'reqs_pending', 'reqs_all', 'reports', 'settings', 'leave_plan_all', 'daily_status','unplanned','summary','employee_summary','unified_entry','leave_hub'];
   if (p && allowed.includes(p)) state.page = p;
 })();
+
+
+// --- Resmi tatiller (2025-2027) ---
+const RESMI_TATILLER = {
+ '2025-01-01':'Yılbaşı','2025-03-30':'Ramazan Bayramı 1. Gün','2025-03-31':'Ramazan Bayramı 2. Gün','2025-04-01':'Ramazan Bayramı 3. Gün','2025-04-23':'23 Nisan','2025-05-01':'1 Mayıs','2025-05-19':'19 Mayıs','2025-06-06':'Kurban Bayramı 1. Gün','2025-06-07':'Kurban Bayramı 2. Gün','2025-06-08':'Kurban Bayramı 3. Gün','2025-06-09':'Kurban Bayramı 4. Gün','2025-07-15':'15 Temmuz','2025-08-30':'30 Ağustos','2025-10-29':'29 Ekim',
+ '2026-01-01':'Yılbaşı','2026-03-20':'Ramazan Bayramı 1. Gün','2026-03-21':'Ramazan Bayramı 2. Gün','2026-03-22':'Ramazan Bayramı 3. Gün','2026-04-23':'23 Nisan','2026-05-01':'1 Mayıs','2026-05-19':'19 Mayıs','2026-05-27':'Kurban Bayramı 1. Gün','2026-05-28':'Kurban Bayramı 2. Gün','2026-05-29':'Kurban Bayramı 3. Gün','2026-05-30':'Kurban Bayramı 4. Gün','2026-07-15':'15 Temmuz','2026-08-30':'30 Ağustos','2026-10-29':'29 Ekim',
+ '2027-01-01':'Yılbaşı','2027-03-09':'Ramazan Bayramı 1. Gün','2027-03-10':'Ramazan Bayramı 2. Gün','2027-03-11':'Ramazan Bayramı 3. Gün','2027-04-23':'23 Nisan','2027-05-01':'1 Mayıs','2027-05-16':'Kurban Bayramı 1. Gün','2027-05-17':'Kurban Bayramı 2. Gün','2027-05-18':'Kurban Bayramı 3. Gün','2027-05-19':'Kurban Bayramı 4. Gün','2027-07-15':'15 Temmuz','2027-08-30':'30 Ağustos','2027-10-29':'29 Ekim'
+};
+// Tatil günlerinde SADECE bu türler hesaplanır (yıllık/ücretsiz izin vb. sayılmaz)
+const TATILDE_SAYILAN = ['Sağlık/Rapor','Mesai'];
+function customHolidays(){ try{ return JSON.parse(localStorage.getItem('mt_customHolidays')||'{}'); }catch(e){ return {}; } }
+function holidayName(ds){ return RESMI_TATILLER[ds] || customHolidays()[ds] || null; }
+function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+// a..b (dahil) aralığındaki gün sayısı; tatil günleri sayılmayan türlerde düşülür
+function countDays(type, a, b){
+  const A=new Date(a), B=new Date(b);
+  const total=Math.round((B-A)/86400000)+1;
+  if(TATILDE_SAYILAN.includes(type)) return total;
+  let n=0; for(let d=new Date(A.getFullYear(),A.getMonth(),A.getDate()); d<=B; d.setDate(d.getDate()+1)){ if(!holidayName(ymd(d))) n++; }
+  return n;
+}
+function addCustomHoliday(){ const d=document.getElementById('chDate').value, n=(document.getElementById('chName').value||'Özel Tatil').trim(); if(!d) return alert('Tarih seçin.'); const m=customHolidays(); m[d]=n; localStorage.setItem('mt_customHolidays',JSON.stringify(m)); render(); }
+function delCustomHoliday(d){ const m=customHolidays(); delete m[d]; localStorage.setItem('mt_customHolidays',JSON.stringify(m)); render(); }
 
 function save() {
   localStorage.setItem('mt_employees', JSON.stringify(state.employees));
@@ -306,7 +356,7 @@ function formatRangeTR(r) {
     return `${formatDateTR(r.date)}, ${r.time} – ${r.endTime}`;
   }
   if (r.endDate && r.endDate !== r.date) {
-    return `${formatDateTR(r.date)} → ${formatDateTR(r.endDate)} (${daysInclusive(r.date, r.endDate)} gün)`;
+    return `${formatDateTR(r.date)} → ${formatDateTR(r.endDate)} (${daysInclusive(r.date, r.endDate)} gün${countDays(r.type,r.date,r.endDate)!==daysInclusive(r.date, r.endDate)?' · '+countDays(r.type,r.date,r.endDate)+' gün hesaplanır (resmi tatil hariç)':''})`;
   }
   return formatDateTR(r.date) + (r.time ? ' ' + r.time : '');
 }
@@ -511,7 +561,7 @@ function annualEntitlement(hireDate) { return annualEntitlementForYear(hireDate,
 function usedAnnualLeaveDays(empId, year) {
   return state.requests
     .filter(r => r.emp === empId && r.type === 'Yıllık İzin' && r.status === 'Onaylandı' && new Date(r.date).getFullYear() === year)
-    .reduce((sum, r) => sum + daysInclusive(r.date, r.endDate || r.date), 0);
+    .reduce((sum, r) => sum + countDays(r.type, r.date, r.endDate || r.date), 0);
 }
 function usedAnnualLeaveDaysThisYear(empId) { return usedAnnualLeaveDays(empId, new Date().getFullYear()); }
 function manualLeaveOpening(e, year) {
@@ -575,7 +625,7 @@ function monthlyStats(empId, year, month) {
     if (end < monthStart || start > monthEnd) return;
     const overlapStart = start < monthStart ? monthStart : start;
     const overlapEnd = end > monthEnd ? monthEnd : end;
-    const days = Math.round((overlapEnd - overlapStart) / 86400000) + 1;
+    const days = countDays(r.type, overlapStart, overlapEnd);
     if (r.type === 'Yıllık İzin') stats.izinGun += days;
     else if (r.type === 'Akşam Erken Çıkış') stats.erken += days;
     else if (r.type === 'Mesai') { stats.cumartesi += days; stats.mesaiSaat += mesaiSaatiPerGun(r) * days; }
@@ -639,7 +689,7 @@ function addUnplanned(){
 }
 function approveReq(id,status){ let r=state.requests.find(x=>x.id===id); if(r){r.status=status;r.approvedAt=new Date().toISOString();save();render();} }
 function summaryData(y,m){
- const rows=[]; activeEmployees().forEach(e=>{let x={emp:e,name:e.name,plan:0,unplan:0,report:0,leave:0,early:0,mesai:0,mesaiSaat:0,noget:0}; state.requests.filter(r=>r.emp===e.id&&r.status!=='Reddedildi'&&inMonth(r,y,m)).forEach(r=>{const d=Math.max(1,Math.round((new Date(r.endDate||r.date)-new Date(r.date))/86400000)+1); if(isUnplanned(r))x.unplan+=d; if(r.type==='Sağlık/Rapor')x.report+=d; if(r.type!=='Sağlık/Rapor'&&isLeaveType(r.type))x.leave+=d; if(r.type==='Akşam Erken Çıkış')x.early+=d; if(r.type==='Mesai'){x.mesai+=d; x.mesaiSaat+=mesaiSaatiPerGun(r)*d;} if(r.type==='Mesai Yok')x.noget+=d; if(isPlanned(r))x.plan+=d;}); x.mesaiSaat=Math.round(x.mesaiSaat*10)/10; rows.push(x);}); return rows;
+ const rows=[]; activeEmployees().forEach(e=>{let x={emp:e,name:e.name,plan:0,unplan:0,report:0,leave:0,early:0,mesai:0,mesaiSaat:0,noget:0}; state.requests.filter(r=>r.emp===e.id&&r.status!=='Reddedildi'&&inMonth(r,y,m)).forEach(r=>{const [ma,mb]=monthRange(y,m); const d=countDays(r.type, r.date>ma?r.date:ma, (r.endDate||r.date)<mb?(r.endDate||r.date):mb); if(isUnplanned(r))x.unplan+=d; if(r.type==='Sağlık/Rapor')x.report+=d; if(r.type!=='Sağlık/Rapor'&&isLeaveType(r.type))x.leave+=d; if(r.type==='Akşam Erken Çıkış')x.early+=d; if(r.type==='Mesai'){x.mesai+=d; x.mesaiSaat+=mesaiSaatiPerGun(r)*d;} if(r.type==='Mesai Yok')x.noget+=d; if(isPlanned(r))x.plan+=d;}); x.mesaiSaat=Math.round(x.mesaiSaat*10)/10; rows.push(x);}); return rows;
 }
 function renderUnplanned(){ const emps=activeEmployees(), list=state.requests.filter(isUnplanned).sort((a,b)=>b.date.localeCompare(a.date)); return `<h2>⚠️ PLANSIZ / SON DAKİKA</h2><div class="info-box">Rapor, son dakika izin, vardiyaya gelmeme veya geç haber verme gibi olayları burada ayrı tutabilirsiniz. Böylece planlı izin ile gerçekleşen plansız durum karışmaz.</div><div class="card"><b>Yeni Plansız Durum</b><select id="upemp">${emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('')}</select><select id="uptype">${unplannedTypes().map(t=>`<option>${t}</option>`).join('')}</select><input id="update" type="date" value="${todayStr()}"><input id="upreason" placeholder="Neden / kısa açıklama"><select id="upnotify"><option>Telefon</option><option>WhatsApp / Mesaj</option><option>Yüz yüze</option><option>Başka personel bildirdi</option><option>Bildirilmedi</option></select><input id="upnote" placeholder="Not"><button class="btn-red" onclick="addUnplanned()">⚠️ KAYDET</button></div><div class="card"><b>Son Plansız Kayıtlar</b>${list.slice(0,30).map(r=>{const e=reqEmployee(r);return `<div class="req-line"><b>${e?e.name:'?'}</b> — ${TYPE_ICONS[r.type]||''} ${r.type}<br>${formatDateTR(r.date)} <span class="pill pill-now">Plansız</span><br><span class="small">${r.reason||r.note||'Açıklama yok'} · Bildirim: ${r.notifyMethod||'-'}</span><div class="row2" style="margin-top:6px"><button class="btn-gray" style="padding:6px;font-size:12px" onclick="openReqEdit('${r.id}','unplanned')">✏️ Düzenle</button><button class="btn-red" style="padding:6px;font-size:12px" onclick="deleteReq('${r.id}')">🗑 Sil</button></div></div>`}).join('')||'<p>Kayıt yok.</p>'}</div><button onclick="state.page='summary';render()">📊 GENEL ÖZET</button><button onclick="state.page='home';render()" class="btn-gray">⬅ Ana Sayfa</button>`; }
 
@@ -701,7 +751,7 @@ function yearSummaryData(y){
   activeEmployees().forEach(e=>{let x={emp:e.id,name:e.name,plan:0,unplan:0,report:0,leave:0,early:0,mesai:0,mesaiSaat:0,noget:0};
     state.requests.filter(r=>r.emp===e.id&&r.status!=='Reddedildi').forEach(r=>{
       const st=new Date(r.date), en=new Date(r.endDate||r.date), ys=new Date(y,0,1), ye=new Date(y,11,31);
-      if(en<ys||st>ye)return; const a=st<ys?ys:st,b=en>ye?ye:en; const d=Math.max(1,Math.round((b-a)/86400000)+1);
+      if(en<ys||st>ye)return; const a=st<ys?ys:st,b=en>ye?ye:en; const d=countDays(r.type,a,b);
       if(isUnplanned(r))x.unplan+=d; if(r.type==='Sağlık/Rapor')x.report+=d; if(r.type!=='Sağlık/Rapor'&&isLeaveType(r.type))x.leave+=d; if(r.type==='Akşam Erken Çıkış')x.early+=d; if(r.type==='Mesai'){x.mesai+=d; x.mesaiSaat+=mesaiSaatiPerGun(r)*d;} if(r.type==='Mesai Yok')x.noget+=d; if(isPlanned(r))x.plan+=d;
     }); x.mesaiSaat=Math.round(x.mesaiSaat*10)/10; rows.push(x);
   }); return rows;
@@ -1224,6 +1274,15 @@ function renderPage() {
         <small>Bir günde çalışan sayısı bu değerin altına düşerse gün ekranında ve takvimde uyarı gösterilir.</small>
       </div>
       <div class="card">
+        <b>Resmi Tatiller</b>
+        <div class="info-box">Resmi tatil günlerinde <b>Yıllık İzin</b> ve <b>Ücretsiz İzin</b> (ve diğer izin türleri) gün sayımına dahil edilmez. Yalnızca <b>Sağlık/Rapor</b> ve <b>Mesai</b> hesaplanır.</div>
+        <label class="f">Özel tatil ekle (ör. idari izin / köprü günü)</label>
+        <div class="row2"><input type="date" id="chDate"><input id="chName" placeholder="Açıklama"></div>
+        <button onclick="addCustomHoliday()">+ Tatil Ekle</button>
+        ${Object.entries(customHolidays()).sort().map(([d,n])=>`<div class="quick-row"><span style="flex:1">${formatDateTR(d)} — ${n}</span><button class="btn-red" onclick="delCustomHoliday('${d}')">Sil</button></div>`).join('')}
+        <details style="margin-top:8px"><summary class="small">Tanımlı resmi tatiller (2025–2027)</summary>${Object.entries(RESMI_TATILLER).map(([d,n])=>`<div class="req-line small">${formatDateTR(d)} — ${n}</div>`).join('')}</details>
+      </div>
+      <div class="card">
         <b>Yedekleme</b><br><br>
         <button class="btn-green" onclick="exportBackup()">📤 Verileri Yedekle (.json)</button>
         <button class="btn-green" style="margin-top:8px" onclick="exportExcel()">📊 Excel'e Aktar (.xlsx)</button>
@@ -1376,10 +1435,11 @@ function renderCalendar() {
     if (matches.length > 5) dots += `<span class="cal-dot" style="background:#999">+${matches.length - 5}</span>`;
 
     cells += `
-      <div class="cal-day ${matches.length ? 'has-req' : ''} ${isToday ? 'today' : ''}"
+      <div class="cal-day ${matches.length ? 'has-req' : ''} ${isToday ? 'today' : ''} ${holidayName(dateStr) ? 'holiday' : ''}" ${holidayName(dateStr) ? `title="${holidayName(dateStr)}"` : ''}
         ${matches.length ? `onclick="viewDay('${dateStr}')"` : ''}>
         ${understaffed ? `<span class="cal-warn" style="color:#c62828">🔴</span>` : (uniqueEmpCount > 1 ? `<span class="cal-warn">⚠</span>` : '')}
         <div class="cal-daynum">${d}</div>
+        ${holidayName(dateStr) ? `<div class="cal-hol">${holidayName(dateStr)}</div>` : ''}
         <div class="cal-dots">${dots}</div>
       </div>
     `;
