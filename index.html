@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Mesai Takip</title>
 <meta name="description" content="Personel mesai, izin ve talep takip uygulaması">
-<meta name="application-version" content="3.0 Kurumsal UI">
+<meta name="application-version" content="2.0 Premium UI">
 <meta name="theme-color" content="#011431">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="32x32" href="Icons/favicon-32.png">
@@ -191,32 +191,9 @@ input,select,textarea{width:100%;padding:12px 13px!important;margin:6px 0!import
 .hm-act{padding:9px 10px!important;border-radius:12px!important;font-size:12px!important;gap:1px!important}
 .hm-act small{font-size:10px!important}
 
-/* ===== Profesyonel Kurumsal Tema ===== */
-:root{--pri:#0b3a75;--pri2:#1456a8;--ink:#1b2a3d;--mut:#6b7a90;--line:#e3e9f1;--bg:#f2f5fa;--card:#fff;--ok:#1b7f4b;--bad:#c0392b;--hol:#fdecea}
-html{-webkit-text-size-adjust:100%}
-body{font-family:Inter,"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif!important;background:var(--bg)!important;color:var(--ink)!important;max-width:980px;margin:0 auto!important;padding:18px 16px 96px!important;line-height:1.45;letter-spacing:.005em}
-h2{font-size:13px!important;font-weight:800!important;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)!important;margin:6px 0 14px!important;padding-bottom:10px;border-bottom:2px solid var(--line);position:relative}
-h2::after{content:"";position:absolute;left:0;bottom:-2px;width:46px;height:2px;background:var(--pri2)}
-.card{background:var(--card)!important;border:1px solid var(--line)!important;border-radius:14px!important;padding:16px!important;box-shadow:0 1px 2px rgba(16,42,77,.04),0 8px 24px rgba(16,42,77,.05)!important;margin-bottom:14px!important}
-button{background:linear-gradient(180deg,var(--pri2),var(--pri))!important;border-radius:10px!important;font-weight:650!important;letter-spacing:.01em;box-shadow:0 1px 2px rgba(11,58,117,.25);transition:transform .08s,box-shadow .15s,filter .15s}
-button:hover{filter:brightness(1.07);box-shadow:0 4px 12px rgba(11,58,117,.25)}button:active{transform:translateY(1px)}
-button.btn-green{background:linear-gradient(180deg,#22995e,var(--ok))!important}button.btn-red{background:linear-gradient(180deg,#d4483a,var(--bad))!important}button.btn-gray{background:linear-gradient(180deg,#7a8798,#5f6b7c)!important}button.btn-orange{background:linear-gradient(180deg,#f08a24,#d9720f)!important}
-input,select,textarea{border:1px solid #d3dbe7!important;border-radius:10px!important;background:#fbfcfe!important;font-size:14px;padding:11px 12px!important;color:var(--ink);transition:border-color .15s,box-shadow .15s}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri2)!important;box-shadow:0 0 0 3px rgba(20,86,168,.15)!important;background:#fff!important}
-label.f{font-size:11px!important;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)!important;margin-top:10px!important}
-.badge{border-radius:999px!important;padding:3px 10px!important;font-size:11px!important;letter-spacing:.03em}
-.info-box,.warn-box,.danger-box{border-radius:10px!important;border-width:1px 1px 1px 4px!important;font-size:12.5px!important}
-.cal-day.holiday{background:var(--hol)!important;border-color:#f3c4be!important}
-.cal-day.holiday .cal-daynum{color:var(--bad)}
-.cal-hol{font-size:8.5px;line-height:1.15;color:#a93226;font-weight:700;margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.cal-day.today{border:2px solid var(--pri2)!important}
-table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
-th{background:#eef3fa;color:var(--pri);font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.05em;padding:9px 8px;border-bottom:1px solid var(--line)}
-td{padding:9px 8px;border-bottom:1px solid #eef2f7}tr:hover td{background:#fafcff}
-.req-line,.quick-row{border-bottom:1px solid #eef2f7!important}
-.type-sheet{border-radius:20px 20px 0 0!important}.type-card{border-radius:14px!important}
-@media(min-width:760px){body{padding-top:28px!important}}
-@media print{button,nav,#bottomNav{display:none!important}body{background:#fff!important}.card{box-shadow:none!important}}
+.cal-day.holiday{background:#fdecea!important}
+.cal-day.holiday .cal-daynum{color:#c0392b}
+.cal-hol{font-size:8.5px;line-height:1.15;color:#a93226;font-weight:700;margin-top:2px}
 </style>
 </head>
 <body>
