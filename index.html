@@ -206,17 +206,21 @@ html[data-theme=dark] .bottom-nav{background:#0f1a2d!important;border-color:var(
 html[data-theme=dark] .req-line,html[data-theme=dark] .quick-row{border-color:var(--line)!important}
 html[data-theme=dark] .info-box{background:#13233d!important;color:#cfe0ff!important}
 html[data-theme=dark] .cal-day.holiday{background:#3a1d22!important}
-/* ===== Sesli komut ===== */
-.vfab{position:fixed;right:14px;z-index:9998;border:0;border-radius:50%;color:#fff;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;padding:0;margin:0;width:50px}
-#vMic{bottom:92px;height:50px;background:linear-gradient(135deg,#1769e0,#4b8ff7);font-size:22px}
-#vMoon{bottom:152px;height:38px;width:38px;right:20px;background:#44546d;font-size:17px}
-#vSheet{position:fixed;inset:0;z-index:9999;background:rgba(5,12,25,.55);display:none;align-items:flex-end;justify-content:center}
-#vSheet.open{display:flex}
-#vBox{background:var(--card,#fff);color:var(--text,#172033);width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:16px 16px 22px;max-height:88vh;overflow:auto}
-#vBox textarea{width:100%;min-height:64px;padding:10px;border:1px solid #ccd5e3;border-radius:10px;font:inherit;resize:vertical;box-sizing:border-box;background:var(--card,#fff);color:var(--text,#172033)}
-#vBox .vr{display:flex;gap:8px}#vBox .vr button{flex:1}
-#vBox .vhint{font-size:12px;color:var(--muted,#718096);margin:6px 0 10px;line-height:1.5}
-#vMicBtn.rec{background:#dc4b5c!important;animation:vp 1s infinite}@keyframes vp{50%{opacity:.6}}
+/* ===== Sesli komut (üst köşe, küçük) ===== */
+body{position:relative}
+#vBar{position:absolute;top:10px;right:10px;z-index:50;display:flex;gap:6px}
+#vBar button{width:32px;height:32px;margin:0;padding:0;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.14);color:#fff;font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+#vBar button.rec,#vMicBtn.rec{background:#dc4b5c!important;animation:vp 1s infinite}@keyframes vp{50%{opacity:.55}}
+.hm-top{padding-right:78px}
+#vPanel{position:fixed;top:50px;left:10px;right:10px;max-width:520px;margin:0 auto;z-index:9999;display:none;background:var(--card,#fff);color:var(--text,#172033);border-radius:14px;padding:10px;box-shadow:0 10px 30px rgba(5,12,25,.35)}
+#vPanel.open{display:block}
+#vPanel .vrow{display:flex;gap:6px;align-items:center}
+#vPanel input,#vPanel select{margin:0;flex:1;min-width:0;padding:9px 10px;border:1px solid #ccd5e3;border-radius:8px;font:inherit;font-size:14px;background:var(--card,#fff);color:var(--text,#172033);box-sizing:border-box}
+#vPanel button{width:auto;margin:0;padding:9px 12px;font-size:14px}
+#vPanel .vform{margin-top:8px;display:grid;gap:6px}
+#vPanel .vmsg{font-size:12px;color:var(--muted,#718096);margin-top:6px}
+#vToast{position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:10000;background:#0d2b52;color:#fff;padding:10px 14px;border-radius:12px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.35);max-width:92%;display:flex;gap:10px;align-items:center}
+#vToast button{width:auto;margin:0;padding:5px 10px;font-size:12px;background:#4b8ff7}
 </style>
 </head>
 <body>
@@ -1886,59 +1890,63 @@ if ('serviceWorker' in navigator) {
  }
 
  // ---------- Arayüz ----------
- var rec=null,lastText='';
- function build(){
-  if(document.getElementById('vSheet'))return;
-  var d=document.createElement('div');
-  d.innerHTML='<button class="vfab" id="vMoon" onclick="toggleTheme()" title="Gece modu">🌙</button><button class="vfab" id="vMic" onclick="vOpen()" title="Sesli / yazılı komut">🎤</button>'+
-  '<div id="vSheet" onclick="if(event.target===this)vClose()"><div id="vBox"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>🎤 Sesli / Yazılı Komut</b><span onclick="vClose()" style="cursor:pointer;font-size:20px;padding:4px 8px">✕</span></div>'+
-  '<textarea id="vText" placeholder="Örn: Ahmet yarın yıllık izin"></textarea>'+
-  '<div class="vhint">Örnekler: <i>Ayşe 5 Kasım’dan 8 Kasım’a rapor</i> · <i>Ali bugün 4 saat mesai</i> · <i>Mehmet yarın 3 gün yıllık izin</i></div>'+
-  '<div class="vr"><button id="vMicBtn" onclick="vListen()">🎙️ Konuş</button><button class="btn-green" onclick="vParse()">✅ Çözümle</button></div><div id="vPrev"></div></div></div>';
-  while(d.firstChild)document.body.appendChild(d.firstChild);
-  applyTheme(theme);
+ var rec=null,toastT=null;
+ function dm(x){var a=x.split('-');return a[2]+'.'+a[1];}
+ function toast(msg,undoId){
+  var o=document.getElementById('vToast');if(o)o.remove();clearTimeout(toastT);
+  var d=document.createElement('div');d.id='vToast';d.innerHTML='<span>'+msg+'</span>'+(undoId?'<button onclick="vUndo(\''+undoId+'\')">Geri al</button>':'');
+  document.body.appendChild(d);toastT=setTimeout(function(){d.remove();},7000);
  }
- window.vOpen=function(){build();document.getElementById('vSheet').classList.add('open');document.getElementById('vPrev').innerHTML='';setTimeout(function(){document.getElementById('vText').focus();},50);};
- window.vClose=function(){if(rec){try{rec.stop();}catch(e){}}document.getElementById('vSheet').classList.remove('open');};
- window.vListen=function(){
+ function build(){
+  if(document.getElementById('vBar'))return;
+  var bar=document.createElement('div');bar.id='vBar';
+  bar.innerHTML='<button id="vMoon" onclick="toggleTheme()" title="Gece modu">🌙</button><button id="vMic" onclick="vOpen()" title="Sesli / yazılı komut">🎤</button>';
+  var pn=document.createElement('div');pn.id='vPanel';
+  pn.innerHTML='<div class="vrow"><input id="vText" placeholder="Örn: Ahmet yarın yıllık izin" onkeydown="if(event.key===\'Enter\')vParse()"><button id="vMicBtn" onclick="vListen()">🎙️</button><button class="btn-green" onclick="vParse()">➤</button></div><div class="vmsg" id="vMsg">Söyleyin veya yazın, otomatik kaydedilir.</div><div id="vPrev"></div>';
+  document.body.appendChild(bar);document.body.appendChild(pn);applyTheme(theme);
+ }
+ window.vOpen=function(){
+  build();var pn=document.getElementById('vPanel');
+  if(pn.classList.contains('open')){vClose();return;}
+  pn.classList.add('open');document.getElementById('vPrev').innerHTML='';document.getElementById('vText').value='';
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR)return alert('Bu tarayıcı sesli girişi desteklemiyor. Yazarak komut verebilirsiniz (Chrome/Edge/Safari önerilir).');
-  var btn=document.getElementById('vMicBtn');
+  if(SR)vListen();else{document.getElementById('vMsg').textContent='Bu tarayıcıda ses yok; yazarak komut verin.';document.getElementById('vText').focus();}
+ };
+ window.vClose=function(){if(rec){try{rec.abort();}catch(e){}rec=null;}var p=document.getElementById('vPanel');if(p)p.classList.remove('open');var m=document.getElementById('vMic');if(m)m.classList.remove('rec');};
+ window.vListen=function(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
+  var btn=document.getElementById('vMicBtn'),mic=document.getElementById('vMic'),msg=document.getElementById('vMsg');
   if(rec){try{rec.stop();}catch(e){}return;}
   rec=new SR();rec.lang='tr-TR';rec.interimResults=true;rec.continuous=false;
-  rec.onstart=function(){btn.classList.add('rec');btn.textContent='⏹ Dinleniyor…';};
-  rec.onresult=function(e){var s='';for(var i=0;i<e.results.length;i++)s+=e.results[i][0].transcript;document.getElementById('vText').value=s;};
-  rec.onerror=function(e){alert(e.error==='not-allowed'?'Mikrofon izni verilmedi. Tarayıcı ayarlarından izin verin.':'Ses algılanamadı ('+e.error+').');};
-  rec.onend=function(){btn.classList.remove('rec');btn.textContent='🎙️ Konuş';rec=null;if(document.getElementById('vText').value.trim())vParse();};
-  rec.start();
+  rec.onstart=function(){btn.classList.add('rec');mic.classList.add('rec');msg.textContent='Dinleniyor…';};
+  rec.onresult=function(e){var t='';for(var i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;document.getElementById('vText').value=t;};
+  rec.onerror=function(e){msg.textContent=e.error==='not-allowed'?'Mikrofon izni kapalı. Tarayıcı ayarından mikrofona izin verin veya yazın.':(e.error==='no-speech'?'Ses duyulmadı.':'Ses algılanamadı ('+e.error+').');};
+  rec.onend=function(){btn.classList.remove('rec');mic.classList.remove('rec');rec=null;if(document.getElementById('vText').value.trim())vParse();};
+  try{rec.start();}catch(e){rec=null;}
  };
+ // Komutu çözümle ve doğrudan kaydet; eksik bilgi varsa yalnızca onu sor
  window.vParse=function(){
-  var text=document.getElementById('vText').value.trim();if(!text)return;lastText=text;
-  var r=parse(text),emps=activeEmployees()||[];
-  var types=(typeof REQ_TYPES!=='undefined'?REQ_TYPES:['Yıllık İzin','Ücretsiz İzin','Sağlık/Rapor','Mesai']);
-  document.getElementById('vPrev').innerHTML='<div style="margin-top:12px;border-top:1px solid #d6deea;padding-top:10px"><b>Kontrol edin ve kaydedin</b>'+
-  '<label class="f">Personel</label><select id="vEmp"><option value="">— Seçin —</option>'+emps.map(function(e){return '<option value="'+e.id+'"'+(e.id===r.emp?' selected':'')+'>'+e.name+'</option>';}).join('')+'</select>'+
-  '<label class="f">Durum</label><select id="vType" onchange="vCalc()"><option value="">— Seçin —</option>'+types.map(function(x){return '<option'+(x===r.type?' selected':'')+'>'+x+'</option>';}).join('')+'</select>'+
-  '<div class="vr"><div style="flex:1"><label class="f">Başlangıç</label><input type="date" id="vS" value="'+r.start+'" onchange="vCalc()"></div><div style="flex:1"><label class="f">Bitiş</label><input type="date" id="vE" value="'+r.end+'" onchange="vCalc()"></div></div>'+
-  '<label class="f">Mesai saati (yalnızca mesaide)</label><input type="number" id="vH" step="0.5" min="0" value="'+r.hours+'" placeholder="12">'+
-  '<div class="small" id="vInfo" style="margin:8px 0"></div><button class="btn-green" onclick="vSave()">💾 Kaydet</button></div>';
-  vCalc();
+  var text=document.getElementById('vText').value.trim();if(!text)return;
+  var r=parse(text);r.note=text;
+  if(r.emp&&r.type)return commit(r);
+  var emps=activeEmployees()||[],types=(typeof REQ_TYPES!=='undefined'?REQ_TYPES:['Yıllık İzin','Ücretsiz İzin','Sağlık/Rapor','Mesai']);
+  document.getElementById('vMsg').textContent=(!r.emp&&!r.type?'Personel ve durum':!r.emp?'Personel':'Durum')+' anlaşılamadı, seçin:';
+  document.getElementById('vPrev').innerHTML='<div class="vform">'+
+   (r.emp?'':'<select id="vEmp"><option value="">Personel seç</option>'+emps.map(function(e){return '<option value="'+e.id+'">'+e.name+'</option>';}).join('')+'</select>')+
+   (r.type?'':'<select id="vType"><option value="">Durum seç</option>'+types.map(function(x){return '<option>'+x+'</option>';}).join('')+'</select>')+
+   '<button class="btn-green" onclick="vFix()">💾 Kaydet</button></div>';
+  window.__vr=r;
  };
- window.vCalc=function(){
-  var t=document.getElementById('vType').value,a=document.getElementById('vS').value,b=document.getElementById('vE').value,el=document.getElementById('vInfo');
-  if(!t||!a||!b||b<a){el.textContent='';return;}
-  var tot=Math.round((new Date(b)-new Date(a))/86400000)+1,n=(typeof countDays==='function')?countDays(t,a,b):tot;
-  el.textContent='Toplam '+tot+' gün'+(n!==tot?' · hesaplanan '+n+' gün (resmi tatil/pazar hariç)':'');
- };
- window.vSave=function(){
-  var emp=document.getElementById('vEmp').value,type=document.getElementById('vType').value,date=document.getElementById('vS').value,end=document.getElementById('vE').value||date;
-  if(!emp||!type)return alert('Personel ve durum seçiniz.');
-  if(!date)return alert('Başlangıç tarihi seçiniz.');
-  if(end<date)return alert('Bitiş tarihi başlangıçtan önce olamaz.');
-  var hv=parseFloat(document.getElementById('vH').value),hours=(!isNaN(hv)&&hv>0)?hv:12;
-  state.requests.push({id:Date.now().toString()+Math.random().toString(36).slice(2,6),emp:emp,type:type,date:date,endDate:end,time:'',endTime:'',note:lastText,planned:true,eventClass:'planli',status:'Bekliyor',used:false,hours:type==='Mesai'?hours:undefined,createdAt:new Date().toISOString()});
-  save();vClose();document.getElementById('vText').value='';render();alert('Kayıt eklendi (onay bekliyor).');
- };
+ window.vFix=function(){var r=window.__vr,e=document.getElementById('vEmp'),t=document.getElementById('vType');if(e)r.emp=e.value;if(t)r.type=t.value;if(!r.emp||!r.type)return;commit(r);};
+ function commit(r){
+  var emps=activeEmployees()||[],emp=emps.filter(function(e){return e.id===r.emp;})[0];
+  var hv=parseFloat(r.hours),hours=(!isNaN(hv)&&hv>0)?hv:12,id=Date.now().toString()+Math.random().toString(36).slice(2,6);
+  state.requests.push({id:id,emp:r.emp,type:r.type,date:r.start,endDate:r.end,time:'',endTime:'',note:r.note||'',planned:true,eventClass:'planli',status:'Bekliyor',used:false,hours:r.type==='Mesai'?hours:undefined,createdAt:new Date().toISOString()});
+  save();vClose();render();
+  var n=(typeof countDays==='function')?countDays(r.type,r.start,r.end):0,tot=Math.round((new Date(r.end)-new Date(r.start))/86400000)+1;
+  toast('✅ '+(emp?emp.name:'')+' · '+r.type+' · '+dm(r.start)+(r.end!==r.start?'–'+dm(r.end):'')+(r.type==='Mesai'?' · '+hours+' sa':(' · '+n+' gün'+(n!==tot?' (tatil/pazar hariç)':''))),id);
+ }
+ window.vUndo=function(id){state.requests=state.requests.filter(function(x){return x.id!==id;});save();render();toast('Kayıt geri alındı.');};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',build);else build();
 })();
 </script>
