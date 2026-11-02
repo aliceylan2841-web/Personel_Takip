@@ -496,7 +496,50 @@ function openDailySheet(empId, d) {
   o.innerHTML = `<div class="type-sheet"><div class="type-sheet-title">${e.name}</div><div class="small" style="margin-bottom:10px">${d.split('-').reverse().join('.')}</div><div class="dl-chips">${(state._dailyOpts || []).map(x => { const st = ST[x] || {}; return `<span class="dl-chip ${x === cur ? 'on' : ''}" style="background:${st.bg};color:${st.text};border-color:${st.border}" onclick="closePeopleSheet();setDailyStatus('${empId}','${d}','${x}')">${x}</span>`; }).join('')}</div><div class="type-sheet-actions"><button class="btn-gray" onclick="closePeopleSheet()">Kapat</button></div></div>`;
 }
 function renderCompactPeople(rows, y, m) {
-  return `<div class="card dl-list">${rows.map(x => `<div class="dl-row" onclick="showEmpMonthDetail('${x.emp.id}',${y},${m})"><span>${x.name}</span><i class="dl-meta">${x.plan} planlı · ${x.unplan} plansız</i></div>`).join('')}</div>`;
+  return `<div class="card dl-list">${rows.map(x => `<div class="dl-row" onclick="showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'all')"><span>${x.name}</span><i class="dl-meta">${x.plan} planlı · ${x.unplan} plansız</i></div>`).join('')}</div>`;
+}
+
+// --- Kategori bazlı tarih detayı (aylık/yıllık) ---
+const CAT_LABELS={all:'Tüm kayıtlar',plan:'Planlı',unplan:'Plansız',report:'Rapor',leave:'İzin',mesai:'Mesai',early:'Erken çıkış',noget:'Mesai yok'};
+function catMatch(r,cat){
+  switch(cat){
+    case 'plan': return isPlanned(r);
+    case 'unplan': return isUnplanned(r);
+    case 'report': return r.type==='Sağlık/Rapor';
+    case 'leave': return r.type!=='Sağlık/Rapor'&&isLeaveType(r.type);
+    case 'mesai': return r.type==='Mesai';
+    case 'early': return r.type==='Akşam Erken Çıkış';
+    case 'noget': return r.type==='Mesai Yok';
+    default: return true;
+  }
+}
+function showEmpPeriodDetail(empId,y,m,scope,cat){
+  const e=state.employees.find(x=>x.id===empId); if(!e) return;
+  cat=cat||'all';
+  const [a,b]=scope==='year'?[`${y}-01-01`,`${y}-12-31`]:monthRange(y,m);
+  const recs=state.requests.filter(r=>r.emp===empId&&r.status!=='Reddedildi'&&(r.endDate||r.date)>=a&&r.date<=b&&catMatch(r,cat)).sort((p,q)=>p.date.localeCompare(q.date));
+  const title=`${e.name} — ${scope==='year'?y:AYLAR[m]+' '+y}`;
+  let overlay=document.getElementById('peopleSheetOverlay');
+  if(!overlay){overlay=document.createElement('div');overlay.id='peopleSheetOverlay';document.body.appendChild(overlay);}
+  overlay.className='type-sheet-overlay';
+  overlay.onclick=ev=>{if(ev.target===overlay)closePeopleSheet();};
+  const chips=Object.keys(CAT_LABELS).map(k=>`<span class="dl-chip ${k===cat?'on':''}" onclick="showEmpPeriodDetail('${empId}',${y},${m},'${scope}','${k}')">${CAT_LABELS[k]}</span>`).join('');
+  overlay.innerHTML=`<div class="type-sheet"><div class="type-sheet-title">${title}</div><div class="dl-chips" style="margin:8px 0">${chips}</div><div class="small">${CAT_LABELS[cat]}: ${recs.length} kayıt</div><div style="max-height:55vh;overflow-y:auto;margin:6px 0 10px">${recs.length?recs.map(r=>`<div class="req-line"><b>${TYPE_ICONS[r.type]||''} ${r.type}</b>${r.type==='Mesai'&&r.hours?` (${r.hours} saat)`:''}<br>${formatRangeTR(r)} <span class="pill ${r.status==='Onaylandı'?'pill-plan':'pill-now'}">${r.status||'-'}</span>${(r.note||r.reason)?`<br><span class="small">${r.note||r.reason}</span>`:''}</div>`).join(''):'<p class="small">Bu dönemde kayıt yok.</p>'}</div><div class="type-sheet-actions"><button class="btn-gray" onclick="closePeopleSheet()">Kapat</button></div></div>`;
+}
+function sumScope(){ return (state.summaryTab==='yearly'||(state.summaryTab==='person'&&state.personScope==='year'))?'year':'month'; }
+function toggleReqGroup(id){
+  state.reqOpen=state.reqOpen||{}; state.reqOpen[id]=!state.reqOpen[id];
+  const el=document.getElementById('rg_'+id); if(el) el.style.display=state.reqOpen[id]?'block':'none';
+  const ar=document.getElementById('rga_'+id); if(ar) ar.textContent=state.reqOpen[id]?'▾':'▸';
+}
+function renderGroupedReqs(filtered,page){
+  const groups={}; filtered.forEach(r=>{(groups[r.emp]=groups[r.emp]||[]).push(r);});
+  const ids=Object.keys(groups).sort((a,b)=>{const na=(state.employees.find(e=>e.id===a)||{name:'~'}).name,nb=(state.employees.find(e=>e.id===b)||{name:'~'}).name;return na.localeCompare(nb,'tr');});
+  state.reqOpen=state.reqOpen||{};
+  return `<div class="card dl-list">`+ids.map(id=>{
+    const e=state.employees.find(x=>x.id===id), list=groups[id], open=!!state.reqOpen[id], pend=list.filter(r=>r.status==='Bekliyor').length;
+    return `<div class="dl-row" onclick="toggleReqGroup('${id}')"><span>${e?e.name:'Silinmiş Çalışan'}</span><i class="dl-meta">${list.length} kayıt${pend?` · ${pend} bekliyor`:''} <b id="rga_${id}">${open?'▾':'▸'}</b></i></div><div id="rg_${id}" style="display:${open?'block':'none'};padding:4px 0 8px">${list.map(r=>renderReqCard(r,page)).join('')}</div>`;
+  }).join('')+`</div>`;
 }
 function closePeopleSheet() { const o = document.getElementById('peopleSheetOverlay'); if (o) o.remove(); }
 function openEmpEditById(empId) { const idx = state.employees.findIndex(e => e.id === empId); if (idx >= 0) openEmpEdit(idx); }
@@ -754,7 +797,7 @@ function renderAnnualLeaveSummary(){
 }
 function yearSummaryData(y){
   const rows=[];
-  activeEmployees().forEach(e=>{let x={emp:e.id,name:e.name,plan:0,unplan:0,report:0,leave:0,early:0,mesai:0,mesaiSaat:0,noget:0};
+  activeEmployees().forEach(e=>{let x={emp:e,name:e.name,plan:0,unplan:0,report:0,leave:0,early:0,mesai:0,mesaiSaat:0,noget:0};
     state.requests.filter(r=>r.emp===e.id&&r.status!=='Reddedildi').forEach(r=>{
       const st=new Date(r.date), en=new Date(r.endDate||r.date), ys=new Date(y,0,1), ye=new Date(y,11,31);
       if(en<ys||st>ye)return; const a=st<ys?ys:st,b=en>ye?ye:en; const d=countDays(r.type,a,b);
@@ -834,13 +877,13 @@ function renderPersonnelWideCards(rows, y, m, tab) {
       <div class="card">
         <b>${x.name}</b>
         <div class="stat-grid" style="margin-top:6px">
-          <div class="stat">📅<b>${x.plan}</b><span class="small">Planlı gün</span></div>
-          <div class="stat">⚠️<b>${x.unplan}</b><span class="small">Plansız gün</span></div>
-          <div class="stat">🏥<b>${x.report}</b><span class="small">Rapor günü</span></div>
-          <div class="stat">🏖️<b>${x.leave}</b><span class="small">İzin günü</span></div>
-          <div class="stat">💼<b>${x.mesai}</b><span class="small">Mesai günü</span></div>
-          <div class="stat">🕐<b>${x.early}</b><span class="small">Erken çıkış</span></div>
-          <div class="stat">➖<b>${x.noget}</b><span class="small">Mesai yok</span></div>
+          <div class="stat" style="cursor:pointer" onclick="showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'plan')">📅<b>${x.plan}</b><span class="small">Planlı gün</span></div>
+          <div class="stat" style="cursor:pointer" onclick="showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'unplan')">⚠️<b>${x.unplan}</b><span class="small">Plansız gün</span></div>
+          <div class="stat" style="cursor:pointer" onclick="showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'report')">🏥<b>${x.report}</b><span class="small">Rapor günü</span></div>
+          <div class="stat" style="cursor:pointer" onclick="showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'leave')">🏖️<b>${x.leave}</b><span class="small">İzin günü</span></div>
+          <div class="stat" style="cursor:pointer" onclick="showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'mesai')">💼<b>${x.mesai}</b><span class="small">Mesai günü</span></div>
+          <div class="stat" style="cursor:pointer" onclick="showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'early')">🕐<b>${x.early}</b><span class="small">Erken çıkış</span></div>
+          <div class="stat" style="cursor:pointer" onclick="showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'noget')">➖<b>${x.noget}</b><span class="small">Mesai yok</span></div>
           <div class="stat">⏱️<b>${x.mesaiSaat}</b><span class="small">Mesai saati</span></div>
         </div>
         ${info.entitlement !== null ? `
@@ -848,7 +891,7 @@ function renderPersonnelWideCards(rows, y, m, tab) {
             🏖️ Yıllık İzin — Hak: <b>${info.entitlement}</b> | Devir: <b>${info.opening}</b> | Kullanılan: <b>${info.used}</b> | Kalan: <b>${info.remaining}</b>
           </div>
         ` : ''}
-        <button style="margin-top:8px" onclick="showEmpMonthDetail('${x.emp.id}',${y},${m})">🔍 Detaylı Kayıtları Gör</button>
+        <button style="margin-top:8px" onclick="showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'all')">🔍 Tüm Kayıtları Gör</button>
       </div>
     `;
   }).join('') || '<p class="small">Kayıt yok.</p>';
@@ -870,12 +913,12 @@ function renderSummaryHub(){
        ${renderCompactPeople(rows, y, m)}
      ` : `
        <div class="small" style="margin:0 0 6px">Detay için bir satıra dokunun, geniş görünüm için üstteki butonu kullanın.</div>
-       <div class="card table-wrap"><table class="mini-table"><tr><th>Personel</th><th>Planlı</th><th>Plansız</th><th>Rapor</th><th>İzin</th><th>Mesai</th><th>Erken</th></tr>${rows.map(x=>`<tr onclick="showEmpMonthDetail('${x.emp.id}',${y},${m})" style="cursor:pointer"><td>${x.name}</td><td>${x.plan}</td><td>${x.unplan}</td><td>${x.report}</td><td>${x.leave}</td><td>${x.mesai}</td><td>${x.early}</td></tr>`).join('')}</table></div>
+       <div class="card table-wrap"><table class="mini-table"><tr><th>Personel</th><th>Planlı</th><th>Plansız</th><th>Rapor</th><th>İzin</th><th>Mesai</th><th>Erken</th></tr>${rows.map(x=>`<tr onclick="showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'all')" style="cursor:pointer"><td>${x.name}</td><td onclick="event.stopPropagation();showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'plan')" style="cursor:pointer;color:#1e4678;font-weight:700;text-decoration:underline dotted">${x.plan}</td><td onclick="event.stopPropagation();showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'unplan')" style="cursor:pointer;color:#1e4678;font-weight:700;text-decoration:underline dotted">${x.unplan}</td><td onclick="event.stopPropagation();showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'report')" style="cursor:pointer;color:#1e4678;font-weight:700;text-decoration:underline dotted">${x.report}</td><td onclick="event.stopPropagation();showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'leave')" style="cursor:pointer;color:#1e4678;font-weight:700;text-decoration:underline dotted">${x.leave}</td><td onclick="event.stopPropagation();showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'mesai')" style="cursor:pointer;color:#1e4678;font-weight:700;text-decoration:underline dotted">${x.mesai}</td><td onclick="event.stopPropagation();showEmpPeriodDetail('${x.emp.id}',${y},${m},sumScope(),'early')" style="cursor:pointer;color:#1e4678;font-weight:700;text-decoration:underline dotted">${x.early}</td></tr>`).join('')}</table></div>
      `}
    `}
    <button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`;
 }
-function renderPersonTab(y,m){ const emp=state.summaryEmp||'all'; const rows=emp==='all'?summaryData(y,m):summaryData(y,m).filter(x=>x.emp===emp); return `<div class="dashboard-card"><select onchange="state.summaryEmp=this.value;render()"><option value="all">Tüm Personel</option>${activeEmployees().map(e=>`<option value="${e.id}" ${emp===e.id?'selected':''}>${e.name}</option>`).join('')}</select><div class="row2" style="margin-top:10px"><button class="btn-green" onclick="exportReportExcel(${y},${m})">📊 EXCEL'E GÖNDER</button><button onclick="exportReportCSV(${y},${m})">📥 CSV</button></div><div class="small" style="margin-top:6px">Seçili ayın Personel Özeti Excel olarak dışa aktarılır.</div></div>${renderPersonnelWideCards(rows,y,m,'person')}`; }
+function renderPersonTab(y,m){ const emp=state.summaryEmp||'all'; const rows=emp==='all'?(state.personScope==='year'?yearSummaryData(y):summaryData(y,m)):(state.personScope==='year'?yearSummaryData(y):summaryData(y,m)).filter(x=>x.emp.id===emp); return `<div class="dashboard-card"><div class="row2" style="margin-bottom:10px"><button class="${state.personScope==='year'?'':'btn-green'}" onclick="state.personScope='month';render()">📅 AYLIK</button><button class="${state.personScope==='year'?'btn-green':''}" onclick="state.personScope='year';render()">📆 YILLIK</button></div><select onchange="state.summaryEmp=this.value;render()"><option value="all">Tüm Personel</option>${activeEmployees().map(e=>`<option value="${e.id}" ${emp===e.id?'selected':''}>${e.name}</option>`).join('')}</select><div class="row2" style="margin-top:10px"><button class="btn-green" onclick="exportReportExcel(${y},${m})">📊 EXCEL'E GÖNDER</button><button onclick="exportReportCSV(${y},${m})">📥 CSV</button></div><div class="small" style="margin-top:6px">Seçili ayın Personel Özeti Excel olarak dışa aktarılır.</div></div>${renderPersonnelWideCards(rows,y,m,'person')}`; }
 function renderPage() {
   const root = document.getElementById('app');
 
@@ -1191,7 +1234,7 @@ function renderPage() {
     const isPending = state.page === 'reqs_pending';
     let filtered = state.requests.filter(r => isPending ? r.status === 'Bekliyor' : true)
       .sort((a, b) => a.date.localeCompare(b.date));
-    let list = filtered.map(r => renderReqCard(r, state.page)).join('');
+    let list = filtered.length ? renderGroupedReqs(filtered, state.page) : '';
     root.innerHTML = `
       <h2>${isPending ? 'BEKLEYEN TALEPLER' : 'TÜM TALEPLER'}</h2>
       ${list || '<p>Kayıt bulunamadı.</p>'}
