@@ -235,6 +235,22 @@ html[data-theme=dark] .set-sec{color:#9cc2ff}
 .set-row:last-child{border-bottom:0}.set-row .set-t{font-weight:800;font-size:14px}.set-row .set-d{font-size:12px;color:var(--muted);margin-top:2px}
 .set-row input[type=number]{width:84px!important;margin:0!important;text-align:center}
 
+.bk-row{padding:10px 0;border-bottom:1px solid var(--line)}.bk-row:last-child{border-bottom:0}
+.bk-name{font-weight:800;font-size:14px}
+.bk-dates{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.bk-dates input{margin:0!important;min-width:0}
+.yc-all{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.yc-m{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px}
+.yc-mt{font-weight:850;font-size:13px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:baseline}
+.yc-mt small{font-weight:700;color:var(--muted);font-size:10px}
+.yc-w,.yc-g{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.yc-w i{font-style:normal;font-size:9px;color:var(--muted);font-weight:800}
+.yc-d{font-size:11px;line-height:22px;border-radius:6px;cursor:pointer;display:inline-block;min-width:20px;text-align:center}
+.yc-d.sun{color:#e5484d}.yc-d.hol{background:rgba(229,72,77,.22);color:#e5484d;font-weight:800}
+.yc-d.l1{background:rgba(47,123,240,.28)}.yc-d.l2{background:rgba(47,123,240,.5)}.yc-d.l3{background:rgba(47,123,240,.72);color:#fff;font-weight:800}.yc-d.l4{background:#1d5fd0;color:#fff;font-weight:800}
+.yc-d.today{outline:2px solid #f59e0b}
+.yc-leg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+
 /* ===== Sesli komut (üst köşe, küçük) ===== */
 body{position:relative}
 #vBar{position:absolute;top:10px;right:10px;z-index:50;display:flex;gap:6px}
@@ -287,7 +303,7 @@ let state = {
 (function applyStartPage() {
   const params = new URLSearchParams(window.location.search);
   const p = params.get('page');
-  const allowed = ['new_req', 'calendar', 'emp_list', 'reqs_pending', 'reqs_all', 'reports', 'settings', 'leave_plan_all', 'daily_status','unplanned','summary','employee_summary','unified_entry','leave_hub'];
+  const allowed = ['new_req', 'calendar', 'emp_list', 'reqs_pending', 'reqs_all', 'reports', 'settings', 'leave_plan_all', 'daily_status','unplanned','summary','employee_summary','unified_entry','leave_hub','bulk_leave','year_cal','kura'];
   if (p && allowed.includes(p)) state.page = p;
 })();
 
@@ -866,6 +882,192 @@ function addUnifiedEntry(){
  const pl=!!document.getElementById('ueplansiz')?.checked, dev=document.getElementById('uedev')?.value||'Hayır'; state.ueDraft=null; state.requests.push({id:Date.now().toString()+Math.random().toString(36).slice(2,6),emp,type,date,endDate:end,time,endTime,note,planned:!pl,eventClass:pl?'plansiz':'planli',status:pl?'Onaylandı':'Bekliyor',used:pl,devamlilik:dev,hours:type==='Mesai'?hours:undefined,createdAt:new Date().toISOString()}); save(); state.page='home'; render();
 }
 function openUnifiedEntry(){ state.ueDraft=null; state.ueMode='gunluk'; state.page='unified_entry'; render(); }
+// ===== Toplu yıllık izin girişi =====
+function openBulkLeave(){ state.page='bulk_leave'; render(); }
+function bulkDays(id){
+  const g=x=>document.getElementById(x), a=g('bks_'+id).value, b=g('bke_'+id).value||a, el=g('bkd_'+id);
+  if(!a){ el.textContent=''; return; }
+  if(b<a){ el.textContent='⚠️ Bitiş başlangıçtan önce'; el.style.color='#e5484d'; return; }
+  el.style.color=''; el.textContent=countDays('Yıllık İzin',a,b)+' gün (resmi tatil/pazar hariç)';
+}
+function bulkApplyAll(){
+  const a=document.getElementById('bkAllS').value, b=document.getElementById('bkAllE').value||a;
+  if(!a) return alert('Önce ortak başlangıç tarihini seçin.');
+  activeEmployees().forEach(e=>{ document.getElementById('bks_'+e.id).value=a; document.getElementById('bke_'+e.id).value=b; bulkDays(e.id); });
+}
+function bulkClearAll(){ activeEmployees().forEach(e=>{ document.getElementById('bks_'+e.id).value=''; document.getElementById('bke_'+e.id).value=''; bulkDays(e.id); }); }
+function saveBulkLeave(){
+  const status=document.getElementById('bkstatus').value, note=document.getElementById('bknote').value.trim();
+  const items=[];
+  for(const e of activeEmployees()){
+    const a=document.getElementById('bks_'+e.id).value, b=document.getElementById('bke_'+e.id).value||a;
+    if(!a) continue;
+    if(b<a) return alert(e.name+': bitiş tarihi başlangıçtan önce olamaz.');
+    items.push({e,a,b});
+  }
+  if(!items.length) return alert('Hiçbir personel için tarih girilmedi.');
+  const conflicts=items.filter(it=>state.requests.some(r=>r.emp===it.e.id&&r.status!=='Reddedildi'&&isLeaveType(r.type)&&r.date<=it.b&&(r.endDate||r.date)>=it.a)).map(it=>it.e.name);
+  if(conflicts.length && !confirm('Bu kişilerin seçilen tarihlerde zaten izni var:\n'+conflicts.join(', ')+'\n\nYine de kaydedilsin mi?')) return;
+  items.forEach((it,i)=>state.requests.push({id:Date.now().toString()+i+Math.random().toString(36).slice(2,6),emp:it.e.id,type:'Yıllık İzin',date:it.a,endDate:it.b,time:'',endTime:'',note,planned:true,eventClass:'planli',status,used:false,devamlilik:'Evet',createdAt:new Date().toISOString()}));
+  save(); alert(items.length+' kişi için yıllık izin kaydedildi.'); state.page='leave_hub'; state.leaveHubTab='plan'; render();
+}
+function renderBulkLeave(){
+  const emps=activeEmployees().slice().sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+  return `<h2>👥 TOPLU YILLIK İZİN</h2>
+  <div class="info-box">Her personelin karşısına başlangıç ve bitiş tarihini yazın; boş bırakılanlar kaydedilmez. Bitiş boşsa tek gün sayılır. Resmi tatil ve pazar günleri izin gününden düşülür.</div>
+  <div class="dashboard-card">
+    <label class="f">Herkese aynı tarih (isteğe bağlı)</label>
+    <div class="bk-dates"><input type="date" id="bkAllS"><input type="date" id="bkAllE"></div>
+    <div class="row2" style="margin-top:8px"><button class="btn-gray" onclick="bulkApplyAll()">Tümüne uygula</button><button class="btn-gray" onclick="bulkClearAll()">Tümünü temizle</button></div>
+  </div>
+  <div class="card">
+    <div class="small" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-weight:800"><span>Başlangıç</span><span>Bitiş</span></div>
+    ${emps.map(e=>`<div class="bk-row"><div class="bk-name">${e.name}</div><div class="bk-dates"><input type="date" id="bks_${e.id}" onchange="bulkDays('${e.id}')"><input type="date" id="bke_${e.id}" onchange="bulkDays('${e.id}')"></div><div class="small" id="bkd_${e.id}"></div></div>`).join('')}
+  </div>
+  <div class="dashboard-card">
+    <label class="f">Kayıt durumu</label><select id="bkstatus"><option value="Bekliyor">Onay bekliyor (normal giriş gibi)</option><option value="Onaylandı">Onaylandı</option></select>
+    <input id="bknote" placeholder="Ortak açıklama / not (isteğe bağlı)">
+    <button onclick="saveBulkLeave()">💾 TÜM İZİNLERİ KAYDET</button>
+  </div>
+  <button class="btn-gray" onclick="state.page='leave_hub';render()">⬅ İzin Yönetimi</button>`;
+}
+
+// ===== Yıllık takvim =====
+function ycalMap(y,emp){
+  const map={};
+  state.requests.filter(r=>r.status!=='Reddedildi'&&isLeaveType(r.type)&&(emp==='all'||r.emp===emp)&&r.date<=y+'-12-31'&&(r.endDate||r.date)>=y+'-01-01').forEach(r=>{
+    const A=new Date(r.date), B=new Date(r.endDate||r.date);
+    for(let d=new Date(A.getFullYear(),A.getMonth(),A.getDate()); d<=B; d.setDate(d.getDate()+1)){
+      if(d.getFullYear()!==y) continue;
+      const ds=ymd(d);
+      if(holidayName(ds)&&!TATILDE_SAYILAN.includes(r.type)) continue;
+      if(PAZAR_DUSEN.includes(r.type)&&d.getDay()===0) continue;
+      (map[ds]=map[ds]||[]).push(r);
+    }
+  });
+  return map;
+}
+function showYcalDay(ds){
+  const y=+ds.slice(0,4), emp=state.ycalEmp||'all', list=ycalMap(y,emp)[ds]||[], hn=holidayName(ds);
+  let overlay=document.getElementById('peopleSheetOverlay');
+  if(!overlay){overlay=document.createElement('div');overlay.id='peopleSheetOverlay';document.body.appendChild(overlay);}
+  overlay.className='type-sheet-overlay'; overlay.onclick=ev=>{if(ev.target===overlay)closePeopleSheet();};
+  overlay.innerHTML=`<div class="type-sheet"><div class="type-sheet-title">${formatDateTR(ds)}</div>${hn?`<div class="small" style="color:#e5484d;font-weight:800">🎌 ${hn}</div>`:''}<div class="small">${list.length} kişi izinde</div><div style="max-height:55vh;overflow-y:auto;margin:6px 0 10px">${list.length?list.map(r=>{const e=reqEmployee(r);return `<div class="req-line"><b>${e?e.name:'?'}</b> — ${r.type}<br><span class="small">${formatRangeTR(r)}</span> <span class="pill ${r.status==='Bekliyor'?'pill-now':'pill-plan'}">${r.status==='Bekliyor'?'Onay bekliyor':r.status}</span></div>`}).join(''):'<p class="small">Bu gün izinli kimse yok.</p>'}</div><div class="type-sheet-actions"><button class="btn-gray" onclick="closePeopleSheet()">Kapat</button></div></div>`;
+}
+function renderYearCal(){
+  const y=state.ycalYear||new Date().getFullYear(), emp=state.ycalEmp||'all', map=ycalMap(y,emp), today=todayStr();
+  const lvl=n=>n>=6?4:n>=4?3:n>=2?2:1;
+  const months=AYLAR.map((mn,mi)=>{
+    const first=new Date(y,mi,1), off=(first.getDay()+6)%7, dim=new Date(y,mi+1,0).getDate();
+    let cells=''; for(let i=0;i<off;i++) cells+='<span></span>';
+    for(let d=1; d<=dim; d++){
+      const ds=y+'-'+pad(mi+1)+'-'+pad(d), dow=new Date(y,mi,d).getDay(), n=(map[ds]||[]).length, hn=holidayName(ds);
+      const cls=['yc-d']; if(dow===0) cls.push('sun'); if(hn) cls.push('hol'); if(n) cls.push('l'+(emp==='all'?lvl(n):3)); if(ds===today) cls.push('today');
+      cells+=`<span class="${cls.join(' ')}" onclick="showYcalDay('${ds}')">${d}</span>`;
+    }
+    const tot=Object.keys(map).filter(k=>+k.slice(5,7)===mi+1).length;
+    return `<div class="yc-m"><div class="yc-mt">${mn}<small>${tot?tot+' gün':''}</small></div><div class="yc-w"><i>Pt</i><i>Sa</i><i>Ça</i><i>Pe</i><i>Cu</i><i>Ct</i><i>Pz</i></div><div class="yc-g">${cells}</div></div>`;
+  }).join('');
+  const emps=activeEmployees().slice().sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+  return `<h2>🗓️ YILLIK İZİN TAKVİMİ</h2>
+  <div class="dashboard-card"><div class="row2"><button class="btn-gray" onclick="state.ycalYear=${y-1};render()">◀ ${y-1}</button><button class="btn-gray" onclick="state.ycalYear=${y+1};render()">${y+1} ▶</button></div>
+  <div class="small" style="text-align:center;font-weight:850;font-size:16px;margin:8px 0">${y}</div>
+  <select onchange="state.ycalEmp=this.value;render()"><option value="all">Tüm personel</option>${emps.map(e=>`<option value="${e.id}" ${emp===e.id?'selected':''}>${e.name}</option>`).join('')}</select>
+  <div class="small yc-leg"><span class="yc-d l1">1</span> az <span class="yc-d l4">6+</span> çok · <span class="yc-d hol">T</span> resmi tatil · <span class="yc-d sun">P</span> pazar</div></div>
+  <div class="yc-all">${months}</div>
+  <div class="small" style="margin:8px 2px">Günlere dokununca o gün izinli olanlar listelenir. Resmi tatil ve pazar günleri izin günü sayılmaz.</div>
+  <button class="btn-gray" onclick="state.page='leave_hub';render()">⬅ İzin Yönetimi</button>`;
+}
+// ===== İzin kurası =====
+function kAdd(ds,n){ const d=new Date(ds+'T00:00:00'); d.setDate(d.getDate()+n); return ymd(d); }
+function kShort(ds){ const d=new Date(ds+'T00:00:00'); return d.getDate()+' '+AYLAR_KISA[d.getMonth()]; }
+function kuraInit(){
+  if(state.kura) return state.kura;
+  const t=new Date(), y=t.getMonth()>=9?t.getFullYear()+1:t.getFullYear();
+  state.kura={start:y+'-05-01',end:y+'-10-31',len:14,quota:2,prefs:{},skip:{},result:null};
+  return state.kura;
+}
+function kuraSlots(k){ const out=[]; const len=Math.max(1,+k.len||14); for(let s=k.start; s&&kAdd(s,len-1)<=k.end; s=kAdd(s,len)) out.push({a:s,b:kAdd(s,len-1)}); return out; }
+function kuraCapture(){
+  const g=id=>document.getElementById(id), k=kuraInit(); if(!g('kuStart')) return;
+  const prevSig=k.start+k.end+k.len;
+  k.start=g('kuStart').value; k.end=g('kuEnd').value; k.len=+g('kuLen').value||14; k.quota=Math.max(1,+g('kuQuota').value||2);
+  if(prevSig!==k.start+k.end+k.len){ k.prefs={}; k.result=null; }
+  activeEmployees().forEach(e=>{
+    k.skip[e.id]=!(g('kuin_'+e.id)?.checked??true);
+    const p=[0,1,2].map(i=>g('kup_'+e.id+'_'+i)?.value??''); if(p.some(x=>x!=='')||k.prefs[e.id]) k.prefs[e.id]=p;
+  });
+}
+function kuraUpdate(){ kuraCapture(); state.kura.result=null; render(); }
+function kShuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function kuraDraw(){
+  kuraCapture(); const k=state.kura, slots=kuraSlots(k);
+  if(!slots.length) return alert('Dönem içinde hiç dilim oluşmadı. Tarihleri ve süreyi kontrol edin.');
+  const ids=activeEmployees().filter(e=>!k.skip[e.id]).map(e=>e.id);
+  if(!ids.length) return alert('Katılımcı seçin.');
+  const cap=slots.map(()=>0), assign={}, got={};
+  for(let rank=0;rank<3;rank++){
+    kShuffle(ids).forEach(id=>{
+      if(assign[id]!==undefined) return;
+      const v=(k.prefs[id]||[])[rank]; if(v===''||v==null) return;
+      const i=+v; if(slots[i]&&cap[i]<k.quota){ assign[id]=i; got[id]=rank+1; cap[i]++; }
+    });
+  }
+  kShuffle(ids).forEach(id=>{
+    if(assign[id]!==undefined) return;
+    const free=slots.map((_,i)=>i).filter(i=>cap[i]<k.quota); if(!free.length) return;
+    const min=Math.min(...free.map(i=>cap[i])), pool=free.filter(i=>cap[i]===min), i=pool[Math.floor(Math.random()*pool.length)];
+    assign[id]=i; got[id]=0; cap[i]++;
+  });
+  k.result={assign,got,ids,slots,drawnAt:new Date().toISOString()};
+  render();
+}
+function kuraSave(){
+  const k=state.kura, r=k&&k.result; if(!r) return;
+  const list=r.ids.filter(id=>r.assign[id]!==undefined);
+  if(!list.length) return alert('Kaydedilecek kayıt yok.');
+  const conflicts=list.filter(id=>{const s=r.slots[r.assign[id]]; return state.requests.some(q=>q.emp===id&&q.status!=='Reddedildi'&&isLeaveType(q.type)&&q.date<=s.b&&(q.endDate||q.date)>=s.a);}).map(id=>(state.employees.find(e=>e.id===id)||{}).name);
+  if(conflicts.length&&!confirm('Bu kişilerin kura tarihlerinde zaten izni var:\n'+conflicts.join(', ')+'\n\nYine de kaydedilsin mi?')) return;
+  list.forEach((id,n)=>{ const s=r.slots[r.assign[id]]; state.requests.push({id:Date.now().toString()+n+Math.random().toString(36).slice(2,6),emp:id,type:'Yıllık İzin',date:s.a,endDate:s.b,time:'',endTime:'',note:'İzin kurası',planned:true,eventClass:'planli',status:'Bekliyor',used:false,devamlilik:'Evet',createdAt:new Date().toISOString()}); });
+  save(); alert(list.length+' kişi için izin "Onay bekliyor" olarak kaydedildi.'); k.result=null; state.page='leave_hub'; state.leaveHubTab='plan'; render();
+}
+function renderKura(){
+  const k=kuraInit(), slots=kuraSlots(k), emps=activeEmployees().slice().sort((a,b)=>a.name.localeCompare(b.name,'tr')), res=k.result;
+  const opt=sel=>`<option value="">—</option>`+slots.map((s,i)=>`<option value="${i}" ${String(sel)===String(i)?'selected':''}>${kShort(s.a)} – ${kShort(s.b)}</option>`).join('');
+  const joined=emps.filter(e=>!k.skip[e.id]).length, capTotal=slots.length*k.quota;
+  let resultHtml='';
+  if(res){
+    const bySlot=res.slots.map((s,i)=>({s,names:res.ids.filter(id=>res.assign[id]===i).map(id=>{const e=state.employees.find(x=>x.id===id);return `${e?e.name:'?'}${res.got[id]?` <span class="small">(${res.got[id]}. tercih)</span>`:''}`;})}));
+    const un=res.ids.filter(id=>res.assign[id]===undefined).map(id=>(state.employees.find(x=>x.id===id)||{}).name);
+    const rows=res.ids.filter(id=>res.assign[id]!==undefined).map(id=>{
+      const e=state.employees.find(x=>x.id===id), s=res.slots[res.assign[id]], days=countDays('Yıllık İzin',s.a,s.b), b=annualLeaveBalance(e,+s.a.slice(0,4));
+      let msg,col;
+      if(b.closing===null||b.closing===undefined){ msg='Bakiye bilinmiyor (işe giriş tarihi yok)'; col='#9aa8bf'; }
+      else { const left=b.closing-days; if(left<0){ msg=`⛔ Hakkı ${Math.abs(left)} gün aşıyor`; col='#e5484d'; } else if(left>0){ msg=`⚠️ ${left} gün hakkı kalıyor (yaz dışında kullanabilir)`; col='#f59e0b'; } else { msg='✅ Hakkı tam kullanılıyor'; col='#22a06b'; } }
+      return `<div class="req-line"><b>${e.name}</b> — ${kShort(s.a)} – ${kShort(s.b)} <span class="small">(${days} gün sayılır${res.got[id]?`, ${res.got[id]}. tercih`:', rastgele'})</span><br><span class="small">Kalan hak: ${b.closing==null?'-':b.closing} gün</span> <span style="color:${col};font-weight:800;font-size:12px">${msg}</span></div>`;
+    }).join('');
+    resultHtml=`<div class="section-title">🎲 Kura sonucu</div>
+    ${un.length?`<div class="danger-box">Kota yetmediği için yerleşemeyenler: ${un.join(', ')}</div>`:''}
+    <div class="card">${bySlot.map(x=>`<div class="req-line"><b>${kShort(x.s.a)} – ${kShort(x.s.b)}</b> <span class="small">${x.names.length}/${k.quota}</span><br>${x.names.join(', ')||'<span class="small">boş</span>'}</div>`).join('')}</div>
+    <div class="section-title">👤 Kişi bazında ve bakiye uyarıları</div><div class="card">${rows}</div>
+    <div class="row2"><button class="btn-gray" onclick="kuraDraw()">🔄 Yeniden çek</button><button class="btn-green" onclick="kuraSave()">💾 Kaydet (onay bekliyor)</button></div>`;
+  }
+  return `<h2>🎲 İZİN KURASI</h2>
+  <div class="info-box">Herkes kendi bloğunu (ör. 2 hafta) bir dilime yerleştirir. Tercihler boş bırakılırsa kota dolmayan dilimlerden rastgele atanır; aynı dilimi isteyenler arasında kura çekilir ve kota dolunca sıradaki tercihe bakılır. Sonuç bakiyeyle karşılaştırılır.</div>
+  <div class="dashboard-card">
+    <label class="f">Dönem başlangıcı / bitişi</label><div class="bk-dates"><input type="date" id="kuStart" value="${k.start}"><input type="date" id="kuEnd" value="${k.end}"></div>
+    <label class="f">Blok süresi (gün) / Aynı dilimde en fazla kişi</label><div class="bk-dates"><input type="number" min="1" id="kuLen" value="${k.len}"><input type="number" min="1" id="kuQuota" value="${k.quota}"></div>
+    <button class="btn-gray" style="margin-top:8px" onclick="kuraUpdate()">Dilimleri güncelle</button>
+    <div class="small" style="margin-top:6px">${slots.length} dilim × ${k.quota} kişi = ${capTotal} yer, ${joined} katılımcı ${joined>capTotal?'<b style="color:#e5484d">— yer yetmiyor</b>':''}</div>
+  </div>
+  <div class="card"><b>Katılımcılar ve tercihler</b>
+    ${emps.map(e=>{const p=k.prefs[e.id]||['','','']; return `<div class="bk-row"><label class="ue-check" style="margin:0 0 6px"><input type="checkbox" id="kuin_${e.id}" ${k.skip[e.id]?'':'checked'}><span>${e.name}</span></label><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">${[0,1,2].map(i=>`<select id="kup_${e.id}_${i}" style="margin:0;min-width:0" title="${i+1}. tercih">${opt(p[i])}</select>`).join('')}</div></div>`;}).join('')}
+    <div class="small" style="margin-top:6px">Her kişide soldan sağa 1., 2. ve 3. tercih.</div>
+  </div>
+  <button onclick="kuraDraw()">🎲 KURAYI ÇEK</button>
+  ${resultHtml}
+  <button class="btn-gray" onclick="state.page='leave_hub';render()">⬅ İzin Yönetimi</button>`;
+}
 function renderLeaveHub(){
   const tab=state.leaveHubTab||'balance';
   const y=new Date().getFullYear(), today=todayStr();
@@ -881,7 +1083,7 @@ function renderLeaveHub(){
     const all=state.requests.filter(r=>r.type==='Yıllık İzin').sort((a,b)=>b.date.localeCompare(a.date));
     body=`<div class="info-box">Yıllık izin kayıtları; planlanan, onay bekleyen, onaylanan ve reddedilen kayıtlar birlikte gösterilir.</div><div class="card">${all.length?all.slice(0,100).map(r=>{const e=reqEmployee(r);const st=r.status||'Durum belirtilmemiş';return `<div class="req-line"><b>${e?e.name:'Personel bulunamadı'}</b><br>${formatRangeTR(r)} <span class="pill ${st==='Onaylandı'?'pill-plan':st==='Bekliyor'?'pill-now':''}">${st}</span><br><span class="small">${r.note||'Not yok'}</span><div class="row2" style="margin-top:6px"><button class="btn-gray" onclick="state.page='leave_plan_all';render()">Kaydı Yönet</button></div></div>`}).join(''):'<p class="small">Henüz yıllık izin kaydı yok.</p>'}</div>`;
   }
-  return `<h2>🏖️ İZİN YÖNETİMİ</h2><div class="small" style="margin:-5px 0 12px">Yıllık izin bakiyesi, planı ve geçmişi tek yerde.</div>${tabs}${body}<button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`;
+  return `<h2>🏖️ İZİN YÖNETİMİ</h2><div class="small" style="margin:-5px 0 12px">Yıllık izin bakiyesi, planı ve geçmişi tek yerde.</div><div class="row2" style="margin-bottom:10px"><button class="btn-green" onclick="openBulkLeave()">👥 Toplu İzin Gir</button><button onclick="state.page='year_cal';render()">🗓️ Yıllık Takvim</button></div><button class="btn-gray" style="margin-bottom:10px" onclick="state.page='kura';render()">🎲 İzin Kurası</button>${tabs}${body}<button class="btn-gray" onclick="state.page='home';render()">⬅ Ana Sayfa</button>`;
 }
 
 const UE_DAILY=[['Yıllık İzin','Yıllık İzin'],['Ücretsiz İzin','Ücretsiz İzin'],['Ücretli İzin','Ücretli İzin'],['Doğum İzni','Doğum İzni'],['Ölüm İzni','Cenaze İzni'],['Evlilik İzni','Evlenme İzni'],['Mesai Yok','Mesaide Gelmedi'],['Diğer','Diğer İzin']];
@@ -975,6 +1177,9 @@ function renderPage() {
   if (state.page === 'employee_summary') { state.summaryTab='person'; root.innerHTML=renderSummaryHub(); return; }
   if (state.page === 'unified_entry') { root.innerHTML=renderUnifiedEntry(); return; }
   if (state.page === 'leave_hub') { root.innerHTML=renderLeaveHub(); return; }
+  if (state.page === 'kura') { root.innerHTML=renderKura(); return; }
+  if (state.page === 'bulk_leave') { root.innerHTML=renderBulkLeave(); return; }
+  if (state.page === 'year_cal') { root.innerHTML=renderYearCal(); return; }
   if (state.page === 'unplanned') { root.innerHTML=renderUnplanned(); return; }
 
   if (state.page === 'home') {
